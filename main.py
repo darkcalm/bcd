@@ -5,8 +5,9 @@ import PIL
 from PIL import Image, ImageDraw, ImageFont
 import os
 
-
 TOKEN = os.environ['your_bot_token_here']
+EPHER = True
+SAVED = None
 
 bot = commands.Bot(
 	command_prefix='/',
@@ -24,23 +25,55 @@ async def on_ready():
 
 @bot.tree.command(name='tbt')
 @app_commands.describe(
+	hash="bot outputs it as text",
 	ephemeral="only you can see this"
 	#add some more ...
 )
 async def tbt(interaction:discord.Interaction,
-								x_label:str="X",
-								y_label:str="Y",
-								x_min_label:str="Xmin",
-								x_max_label:str="Xmax",
-								y_min_label:str="Ymin",
-								y_max_label:str="Ymax",
-								q1_label:str="I",
-								q2_label:str="II",
-								q3_label:str="III",
-								q4_label:str="IV",
-								title:str="2x2",
-							ephemeral:bool=True):
+							hash:str=None,
+								x_label:str="",
+								y_label:str="",
+								x_min_label:str="",
+								x_max_label:str="",
+								y_min_label:str="",
+								y_max_label:str="",
+								q1_label:str="",
+								q2_label:str="",
+								q3_label:str="",
+								q4_label:str="",
+								title:str="",
+							ephemeral:bool=True
+						 	):
 
+	params = [
+		x_label,
+		y_label,
+		x_min_label,
+		x_max_label,
+		y_min_label,
+		y_max_label,
+		q1_label,
+		q2_label,
+		q3_label,
+		q4_label,
+		title
+	]
+
+	#might want to amend by replying to bot
+	if hash != None:
+		for i, keep in enumerate(hash.split(".:.")[1:-1]):
+			if params[i] == "":
+				params[i] = keep
+		
+		#might want to record amend action
+		#might want hash to be polymorphic as prompt
+		pass
+	else:
+		pass
+
+	#should add escape
+	tbt = ".:." + (".:.").join(params) + ".:."
+								
 	width = 400
 	height = 400
 	ox = width/2
@@ -89,7 +122,6 @@ async def tbt(interaction:discord.Interaction,
 	drawtextdefault((width-getwidth(x_max_label), oy-getheight(x_max_label)), x_max_label)
 
 
-	
 	# draw y lines, labels, limits
 	drawlinedefualt((ox, 0, ox, height))
 
@@ -108,13 +140,16 @@ async def tbt(interaction:discord.Interaction,
 	
 	# draw title
 	drawtextdefault((0, 0), title)
-
 	
 	# save image
 	img.save('diagram.png')
 	
 	# send to discord
 	with open('diagram.png', 'rb') as f:
-		await interaction.response.send_message(file=discord.File(f), ephemeral=ephemeral)
+		await interaction.response.send_message(
+			tbt,
+			file=discord.File(f),
+			ephemeral=ephemeral
+		)
 
 bot.run(TOKEN)
