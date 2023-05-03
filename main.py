@@ -4,10 +4,13 @@ from discord.ext import commands
 import PIL
 from PIL import Image, ImageDraw, ImageFont
 import os
+import inspect
 
 TOKEN = os.environ['your_bot_token_here']
-EPHER = True
-SAVED = None
+
+PARAM_NUM = 11
+
+HASH_DELIM = '.:.'
 
 bot = commands.Bot(
 	command_prefix='/',
@@ -23,56 +26,148 @@ async def on_ready():
 	except Exception as e:
 		print(e)
 
+@bot.event
+async def on_message(interaction):
+	if interaction.author.id == bot.user.id:
+		return
+
+	if interaction.reference:
+		replied = await interaction.channel.fetch_message(
+			interaction.reference.message_id
+		)
+		if replied.author.id == bot.user.id:
+			if interaction.content in ['delete', 'd']:
+				await replied.delete()
+
+			else:
+				hash = await tohash(interaction.content)
+				if hash == False:
+					await interaction.author.send(
+						"ex. x name, y name with space"
+					)
+				
+				else:
+					hash = await amendhash(replied.content, hash)
+					await tofile(hash)
+					with open('diagram.png', 'rb') as f:
+						await interaction.channel.send(
+							hash,
+							file=discord.File(f)
+						)
+
 @bot.tree.command(name='tbt')
 @app_commands.describe(
-	hash="bot outputs it as text",
-	ephemeral="only you can see this"
+	hash = "the line of text the bot outputs",
+	_x = "x coordinate",
+	_y = "y coordinate",
+	_xn = "when x is - (left)",
+	_xp = "when x is + (right)",
+	_yn = "when y is - (down)",
+	_yp = "when y is + (up)",
+	_1 = "1st quadrant",
+	_2 = "2nd quadrant",
+	_3 = "3rd quadrant",
+	_4 = "4th quadrant",
+	_t = "title of diagram",
+	_pub = "True = publish, otherwise by default only you can see the bot reply",
 	#add some more ...
 )
 async def tbt(interaction:discord.Interaction,
 							hash:str=None,
-								x_label:str="",
-								y_label:str="",
-								x_min_label:str="",
-								x_max_label:str="",
-								y_min_label:str="",
-								y_max_label:str="",
-								q1_label:str="",
-								q2_label:str="",
-								q3_label:str="",
-								q4_label:str="",
-								title:str="",
-							ephemeral:bool=True
+								_x:str="",
+								_y:str="",
+								_xn:str="",
+								_xp:str="",
+								_yn:str="",
+								_yp:str="",
+								_1:str="",
+								_2:str="",
+								_3:str="",
+								_4:str="",
+								_t:str="",
+							_pub:bool=False
 						 	):
 
-	params = [
-		x_label,
-		y_label,
-		x_min_label,
-		x_max_label,
-		y_min_label,
-		y_max_label,
-		q1_label,
-		q2_label,
-		q3_label,
-		q4_label,
-		title
-	]
+	hash = await tohash(hash)
+	if hash == False:
+		await interaction.response.send_message(
+			"incorrect format ... or a bug?",
+			ephemeral=True
+		)
 
-	#might want to amend by replying to bot
-	if hash != None:
-		for i, keep in enumerate(hash.split(".:.")[1:-1]):
-			if params[i] == "":
-				params[i] = keep
-		
-		#might want to record amend action
-		#might want hash to be polymorphic as prompt
-		pass
 	else:
-		pass
+		hash = await amendhash(hash, [_x, _y, _xn, _xp, _yn, _yp, _1, _2, _3, _4, _t])
+		await tofile(hash)
+		# send to discord
+		with open('diagram.png', 'rb') as f:
+			await interaction.response.send_message(
+				hash,
+				file = discord.File(f),
+				ephemeral = not _pub
+			)
+	
 
-	#should add escape
-	tbt = ".:." + (".:.").join(params) + ".:."
+#### utility
+
+options = [
+	'_x','_y','_xn','_xp','_yn','_yp','_1','_2','_3','_4','_t',
+	'x','y','xn','xp','yn','yp','1','2','3','4','t'
+]
+
+
+
+async def tohash(hash):
+	if hash is None:
+		return hash
+	
+	cuts = hash.split(", ")
+	if len(cuts) == 1 and len(hash.split(" ")) == 1:
+		if len(hash.split((HASH_DELIM))) == PARAM_NUM:
+			return hash
+		return False
+		
+	indexes = []
+	values = []
+	for cut in cuts:
+		c = cut.split(" ")
+		if len(c) == 1 or c[0] not in options:
+			return False
+		else:
+			indexes.append(options.index(c[0]) % PARAM_NUM)
+			values.append(" ".join(c[1:]))
+
+	hash = ""
+	for i in range(PARAM_NUM):
+		if i in indexes:
+			hash += values[indexes.index(i)]
+		if i != PARAM_NUM - 1:
+			hash += HASH_DELIM
+	
+	return hash
+
+
+async def amendhash(hash=None, hash2=None):
+	if hash2 == None:
+		return hash
+	if hash == None:
+		if isinstance(hash2, list):
+			return HASH_DELIM.join(hash2)
+		else:
+			return hash2
+	if not isinstance(hash2, list):
+		hash2 = hash2.split(HASH_DELIM)
+		
+	for i, keep in enumerate(hash.split(HASH_DELIM)):
+		if hash2[i] == "":
+			hash2[i] = keep
+	return HASH_DELIM.join(hash2)
+
+
+
+async def tofile(hash):
+	[_x, _y, _xn, _xp, _yn, _yp, _1, _2, _3, _4, _t] = hash.split(HASH_DELIM)
+
+	## draw
 								
 	width = 400
 	height = 400
@@ -116,40 +211,32 @@ async def tbt(interaction:discord.Interaction,
 	# draw x lines, labels, limits
 	drawlinedefualt((0, oy, width, oy))
 
-	drawtextdefault((q1x-getwidth(x_label)/2, oy), x_label)
+	drawtextdefault((q1x-getwidth(_x)/2, oy), _x)
 
-	drawtextdefault((0, oy-getheight(x_min_label)), x_min_label)
-	drawtextdefault((width-getwidth(x_max_label), oy-getheight(x_max_label)), x_max_label)
+	drawtextdefault((0, oy-getheight(_xn)), _xn)
+	drawtextdefault((width-getwidth(_xp), oy-getheight(_xp)), _xp)
 
 
 	# draw y lines, labels, limits
 	drawlinedefualt((ox, 0, ox, height))
 
-	drawtextdefault((ox-getheight(y_label), q1y-getwidth(y_label)/2), y_label, font90)
+	drawtextdefault((ox-getheight(_y), q1y-getwidth(_y)/2), _y, font90)
 
-	drawtextdefault((ox, height-getheight(y_min_label)), y_min_label)
-	drawtextdefault((ox, 0), y_max_label)
+	drawtextdefault((ox, height-getheight(_yn)), _yn)
+	drawtextdefault((ox, 0), _yp)
 	
 
 	# draw quadrant labels
-	drawtextdefault((q1x-getwidth(q1_label)/2, q1y), q1_label)
-	drawtextdefault((q2x-getwidth(q2_label)/2, q2y), q2_label)
-	drawtextdefault((q3x-getwidth(q3_label)/2, q3y), q3_label)
-	drawtextdefault((q4x-getwidth(q4_label)/2, q4y), q4_label)
+	drawtextdefault((q1x-getwidth(_1)/2, q1y), _1)
+	drawtextdefault((q2x-getwidth(_2)/2, q2y), _2)
+	drawtextdefault((q3x-getwidth(_3)/2, q3y), _3)
+	drawtextdefault((q4x-getwidth(_4)/2, q4y), _4)
 	
 	
-	# draw title
-	drawtextdefault((0, 0), title)
+	# draw _t
+	drawtextdefault((0, 0), _t)
 	
 	# save image
 	img.save('diagram.png')
-	
-	# send to discord
-	with open('diagram.png', 'rb') as f:
-		await interaction.response.send_message(
-			tbt,
-			file=discord.File(f),
-			ephemeral=ephemeral
-		)
 
 bot.run(TOKEN)
