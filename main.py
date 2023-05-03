@@ -1,16 +1,21 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import PIL
-from PIL import Image, ImageDraw, ImageFont
+
 import os
 import inspect
+
+import PIL
+from PIL import Image, ImageDraw, ImageFont
 
 TOKEN = os.environ['your_bot_token_here']
 
 PARAM_NUM = 11
 
 HASH_DELIM = '.:.'
+LINE_WIDTH = 1
+WIDEFIT = 1
+MIDFIT = 0.6
 
 bot = commands.Bot(
 	command_prefix='/',
@@ -121,7 +126,7 @@ async def tohash(hash):
 		return hash
 	
 	cuts = hash.split(", ")
-	if len(cuts) == 1 and len(hash.split(" ")) == 1:
+	if len(cuts) == 1 and len(hash.split(".:.")) > 1:
 		if len(hash.split((HASH_DELIM))) == PARAM_NUM:
 			return hash
 		return False
@@ -197,44 +202,82 @@ async def tofile(hash):
 	def drawtextdefault(xy, text, font=font):
 		draw.text(xy, text, font=font, fill="black")
 
-	def drawlinedefualt(xy):
+	def drawprose(xy, text, wrapsize, anchor, font=font):
+		wrap = []
+		size = 0
+		lasti = 0
+		suffix = {'+': ' ', '0': '', '-': ''}[anchor[1]]
+		for i in range(len(text)):
+			if size + getw(text[i]) < wrapsize:
+				size += getw(text[i])
+			else:
+				if len(text[:i].split(" ")) < 2:
+					wrap.append(text[lasti:i])
+					lasti = i + 1
+				else:
+					append = " ".join(text[lasti:i].split(" ")[:-1]) + suffix
+					wrap.append(append)
+					lasti = lasti + len(append) + (1 if suffix == '' else 0)
+				size = 0
+		wrap.append(text[lasti:])
+
+		print(wrap)
+		
+		lh = geth(text)
+		x, y = {'v-': xy,
+						'v0': (xy[0], xy[1] - lh*len(wrap)/2),
+						'v+': (xy[0], xy[1] - lh*len(wrap)),
+						'h-': xy,
+						'h0': (xy[0] - lh*len(wrap)/2, xy[1]),
+						'h+': (xy[0] - lh*len(wrap), xy[1])
+					 } [anchor[0] + anchor[2]]
+		for i in range(len(wrap)):
+			drawtextdefault({
+				'v+': (x, y + lh*i),
+				'v0': (x - getw(wrap[i])/2, y + lh*i),
+				'v-': (x - getw(wrap[i]), y + lh*i),
+				'h+': (x + lh*i, y - getw(wrap[i])),
+				'h0': (x + lh*i, y - getw(wrap[i])/2),
+				'h-': (x + lh*i, y)
+				} [anchor[0] + anchor[1]], wrap[i], font=font)
+		pass
+		
+	def drawline(xy):
 		draw.line(xy, fill='black')
 
-	def getwidth(target):
+	def getw(target):
 		return font.getbbox(target)[2]
 
-	def getheight(target):
+	def geth(target):
 		return font.getbbox(target)[3]
-
-
-							
+	
 	# draw x lines, labels, limits
-	drawlinedefualt((0, oy, width, oy))
+	drawline((0, oy, width, oy))
 
-	drawtextdefault((q1x-getwidth(_x)/2, oy), _x)
+	drawprose((q1x, oy), _x, (width-ox) * WIDEFIT, 'v0-')
 
-	drawtextdefault((0, oy-getheight(_xn)), _xn)
-	drawtextdefault((width-getwidth(_xp), oy-getheight(_xp)), _xp)
+	drawprose((0, oy), _xn, ox * MIDFIT, 'v++')
+	drawprose((width, oy), _xp, (width-ox) * MIDFIT, 'v-+')
 
 
 	# draw y lines, labels, limits
-	drawlinedefualt((ox, 0, ox, height))
+	drawline((ox - LINE_WIDTH/2, 0, ox - LINE_WIDTH/2, height))
 
-	drawtextdefault((ox-getheight(_y), q1y-getwidth(_y)/2), _y, font90)
+	drawprose((ox, q1y), _y, (oy) * WIDEFIT, 'h0+', font90)
 
-	drawtextdefault((ox, height-getheight(_yn)), _yn)
-	drawtextdefault((ox, 0), _yp)
+	drawprose((ox, height), _yn, (width-ox) * MIDFIT, 'v++')
+	drawprose((ox, 0), _yp, (width-ox) * MIDFIT, 'v+-')
 	
 
 	# draw quadrant labels
-	drawtextdefault((q1x-getwidth(_1)/2, q1y), _1)
-	drawtextdefault((q2x-getwidth(_2)/2, q2y), _2)
-	drawtextdefault((q3x-getwidth(_3)/2, q3y), _3)
-	drawtextdefault((q4x-getwidth(_4)/2, q4y), _4)
+	drawprose((q1x, q1y), _1, (width-ox) * MIDFIT, 'v00')
+	drawprose((q2x, q2y), _2, (ox) * MIDFIT, 'v00')
+	drawprose((q3x, q3y), _3, (ox) * MIDFIT, 'v00')
+	drawprose((q4x, q4y), _4, (width-ox) * MIDFIT, 'v00')
 	
-	
-	# draw _t
-	drawtextdefault((0, 0), _t)
+
+	# draw title
+	drawprose((0, 0), _t, ox * MIDFIT, 'v+-')
 	
 	# save image
 	img.save('diagram.png')
