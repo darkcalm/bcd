@@ -2,11 +2,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-import os
-import inspect
-
 import PIL
 from PIL import Image, ImageDraw, ImageFont
+from pilmoji import Pilmoji
+
+# hotfix: pilmoji core.py font.size -> (font.size if hasattr(font,'size') else font.font.size)
+
+import os
 
 TOKEN = os.environ['your_bot_token_here']
 
@@ -168,7 +170,6 @@ async def amendhash(hash=None, hash2=None):
 	return HASH_DELIM.join(hash2)
 
 
-
 async def tofile(hash):
 	[_x, _y, _xn, _xp, _yn, _yp, _1, _2, _3, _4, _t] = hash.split(HASH_DELIM)
 
@@ -186,21 +187,23 @@ async def tofile(hash):
 	q3y = oy + (height-oy)/2
 	q4x = q1x
 	q4y = q3y
-	
+
 	
 	# images
-	img = Image.new('RGB', (width, height), color='white')
+	image = Image.new('RGB', (width, height), color='white')
 	
 	# draws
-	draw = ImageDraw.Draw(img)
+	draw = ImageDraw.Draw(image)
 	
 	# fonts
 	font = ImageFont.truetype('LDFComicSans.ttf', 16)
 	font90 = ImageFont.TransposedFont(font, Image.ROTATE_90)
 
 	# utilities
+
 	def drawtextdefault(xy, text, font=font):
-		draw.text(xy, text, font=font, fill="black")
+		with Pilmoji(image) as pilmoji:
+			pilmoji.text((int(xy[0]), int(xy[1])), text, font=font, fill="black")
 
 	def drawprose(xy, text, wrapsize, anchor, font=font):
 		wrap = []
@@ -220,8 +223,6 @@ async def tofile(hash):
 					lasti = lasti + len(append) + (1 if suffix == '' else 0)
 				size = 0
 		wrap.append(text[lasti:])
-
-		print(wrap)
 		
 		lh = geth(text)
 		x, y = {'v-': xy,
@@ -280,6 +281,6 @@ async def tofile(hash):
 	drawprose((0, 0), _t, ox * MIDFIT, 'v+-')
 	
 	# save image
-	img.save('diagram.png')
+	image.save('diagram.png')
 
 bot.run(TOKEN)
