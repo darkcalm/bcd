@@ -5,8 +5,9 @@ from discord.ext import commands
 import PIL
 from PIL import Image, ImageDraw, ImageFont
 from pilmoji import Pilmoji
+import emoji
 
-# hotfix: pilmoji core.py font.size -> (font.size if hasattr(font,'size') else font.font.size)
+# hotfixed pil (font.size if hasattr(font,'size') else font.font.size)
 
 import os
 
@@ -175,8 +176,8 @@ async def tofile(hash):
 
 	## draw
 								
-	width = 400
-	height = 400
+	width = 800
+	height = 800
 	ox = width/2
 	oy = height/2
 	q1x = ox + (width-ox)/2
@@ -196,7 +197,7 @@ async def tofile(hash):
 	draw = ImageDraw.Draw(image)
 	
 	# fonts
-	font = ImageFont.truetype('LDFComicSans.ttf', 16)
+	font = ImageFont.truetype('LDFComicSans.ttf', 32)
 	font90 = ImageFont.TransposedFont(font, Image.ROTATE_90)
 
 	# utilities
@@ -209,37 +210,36 @@ async def tofile(hash):
 		wrap = []
 		size = 0
 		lasti = 0
-		suffix = {'+': ' ', '0': '', '-': ''}[anchor[1]]
 		for i in range(len(text)):
 			if size + getw(text[i]) < wrapsize:
 				size += getw(text[i])
 			else:
-				if len(text[:i].split(" ")) < 2:
-					wrap.append(text[lasti:i])
+				if len(text[:i].strip(" ").split(" ")) < 2:
+					wrap.append(text[lasti:i].strip(" "))
 					lasti = i + 1
 				else:
-					append = " ".join(text[lasti:i].split(" ")[:-1]) + suffix
+					append = " ".join(text[lasti:i].strip(" ").split(" ")[:-1])
 					wrap.append(append)
-					lasti = lasti + len(append) + (1 if suffix == '' else 0)
+					lasti = lasti + len(append) + 1
 				size = 0
-		wrap.append(text[lasti:])
+		wrap.append(text[lasti:].strip(" "))
 		
 		lh = geth(text)
-		x, y = {'v-': xy,
-						'v0': (xy[0], xy[1] - lh*len(wrap)/2),
-						'v+': (xy[0], xy[1] - lh*len(wrap)),
-						'h-': xy,
-						'h0': (xy[0] - lh*len(wrap)/2, xy[1]),
-						'h+': (xy[0] - lh*len(wrap), xy[1])
+		x, y = {'h-': xy,
+						'h0': (xy[0], xy[1] - lh*len(wrap)/2),
+						'h+': (xy[0], xy[1] - lh*len(wrap)),
+						'v-': xy,
+						'v0': (xy[0] - lh*len(wrap)/2, xy[1]),
+						'v+': (xy[0] - lh*len(wrap), xy[1])
 					 } [anchor[0] + anchor[2]]
 		for i in range(len(wrap)):
 			drawtextdefault({
-				'v+': (x, y + lh*i),
-				'v0': (x - getw(wrap[i])/2, y + lh*i),
-				'v-': (x - getw(wrap[i]), y + lh*i),
-				'h+': (x + lh*i, y - getw(wrap[i])),
-				'h0': (x + lh*i, y - getw(wrap[i])/2),
-				'h-': (x + lh*i, y)
+				'h+': (x, y + lh*i),
+				'h0': (x - getw(wrap[i])/2, y + lh*i),
+				'h-': (x - getw(wrap[i]), y + lh*i),
+				'v+': (x + lh*i, y - getw(wrap[i])),
+				'v0': (x + lh*i, y - getw(wrap[i])/2),
+				'v-': (x + lh*i, y)
 				} [anchor[0] + anchor[1]], wrap[i], font=font)
 		pass
 		
@@ -247,7 +247,9 @@ async def tofile(hash):
 		draw.line(xy, fill='black')
 
 	def getw(target):
-		return font.getbbox(target)[2]
+		return font.getlength(
+			emoji.replace_emoji(target, '   ')
+		)
 
 	def geth(target):
 		return font.getbbox(target)[3]
@@ -255,30 +257,30 @@ async def tofile(hash):
 	# draw x lines, labels, limits
 	drawline((0, oy, width, oy))
 
-	drawprose((q1x, oy), _x, (width-ox) * WIDEFIT, 'v0-')
+	drawprose((q1x, oy), _x, (width-ox) * WIDEFIT, 'h0-')
 
-	drawprose((0, oy), _xn, ox * MIDFIT, 'v++')
-	drawprose((width, oy), _xp, (width-ox) * MIDFIT, 'v-+')
+	drawprose((0, oy), _xn, ox * MIDFIT, 'h++')
+	drawprose((width, oy), _xp, (width-ox) * MIDFIT, 'h-+')
 
 
 	# draw y lines, labels, limits
 	drawline((ox - LINE_WIDTH/2, 0, ox - LINE_WIDTH/2, height))
 
-	drawprose((ox, q1y), _y, (oy) * WIDEFIT, 'h0+', font90)
+	drawprose((ox, q1y), _y, (oy) * WIDEFIT, 'v0+', font90)
 
-	drawprose((ox, height), _yn, (width-ox) * MIDFIT, 'v++')
-	drawprose((ox, 0), _yp, (width-ox) * MIDFIT, 'v+-')
+	drawprose((ox, height), _yn, (width-ox) * MIDFIT, 'h++')
+	drawprose((ox, 0), _yp, (width-ox) * MIDFIT, 'h+-')
 	
 
 	# draw quadrant labels
-	drawprose((q1x, q1y), _1, (width-ox) * MIDFIT, 'v00')
-	drawprose((q2x, q2y), _2, (ox) * MIDFIT, 'v00')
-	drawprose((q3x, q3y), _3, (ox) * MIDFIT, 'v00')
-	drawprose((q4x, q4y), _4, (width-ox) * MIDFIT, 'v00')
+	drawprose((q1x, q1y), _1, (width-ox) * MIDFIT, 'h00')
+	drawprose((q2x, q2y), _2, (ox) * MIDFIT, 'h00')
+	drawprose((q3x, q3y), _3, (ox) * MIDFIT, 'h00')
+	drawprose((q4x, q4y), _4, (width-ox) * MIDFIT, 'h00')
 	
 
 	# draw title
-	drawprose((0, 0), _t, ox * MIDFIT, 'v+-')
+	drawprose((0, 0), _t, ox * MIDFIT, 'h+-')
 	
 	# save image
 	image.save('diagram.png')
