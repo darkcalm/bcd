@@ -146,21 +146,20 @@ async def amendhash(hash=None, hash2=None):
 			hash2[i] = keep
 	return HASH_DELIM.join(hash2)
 
-
-
-
-
 # big function, needs separation
 
 async def tofile(hash):
-	
-	prep = hash.split(HASH_DELIM)
-	preplen = len(prep)
-	if preplen < PARAM_NUM:
-		prep = prep.extend([""]*(PARAM_NUM-preplen))
-	elif preplen > PARAM_NUM:
-		prep = prep[:PARAM_NUM]
-	[_x, _y, _xn, _xp, _yn, _yp, _1, _2, _3, _4, _t] = prep
+
+
+	if type(hash) == str:
+		hash = hash.split(HASH_DELIM)
+		preplen = len(hash)
+		if preplen < PARAM_NUM:
+			hash = hash.extend([""]*(PARAM_NUM-preplen))
+		elif preplen > PARAM_NUM:
+			hash = hash[:PARAM_NUM]
+
+	[_1, _2, _3, _4, _yp, _xn, _yn, _xp, _x, _y, _t] = hash
 	
 	width = 800
 	height = 800
@@ -255,8 +254,7 @@ async def tofile(hash):
 	def drawcurve(xyr):
 		r = int(math.sqrt((xyr[0]-xyr[2])**2 + (xyr[1]-xyr[3])**2))
 		xyxy = (xyr[0] - r, xyr[1] - r, xyr[0] + r, xyr[1] + r)
-		draw.ellipse(xyxy, outline=FONT_COLOR)
-
+		draw.ellipse(xyxy, outline=FONT_COLOR)		
 
 	#should replace drawing functions with identification and draw after effecient shape is calculated
 
@@ -269,72 +267,85 @@ async def tofile(hash):
 
 
 	#morphisms
-	
+
+	if (_yp != ''):
+		drawline((ox - LINE_WIDTH/2, 0, ox - LINE_WIDTH/2, oy))
+		drawprose((ox, 0), _yp, (width-ox) * MIDFIT, 'h+-')	
+		
 	if (_xn != ''):
 		drawline((0, oy, ox - LINE_WIDTH/2, oy))
 		drawprose((0, oy), _xn, ox * MIDFIT, 'h++')
 
+	if (_yn != ''):
+		drawline((ox - LINE_WIDTH/2, height, ox - LINE_WIDTH/2, oy))
+		drawprose((ox, height), _yn, (width-ox) * MIDFIT, 'h++')
+		
 	if (_xp != ''):
 		drawline((width, oy, ox - LINE_WIDTH/2, oy))
 		drawprose((width, oy), _xp, (width-ox) * MIDFIT, 'h-+')
 	
-	if (_yn != ''):
-		drawline((ox - LINE_WIDTH/2, height, ox - LINE_WIDTH/2, oy))
-		drawprose((ox, height), _yn, (width-ox) * MIDFIT, 'h++')
-	
-	if (_yp != ''):
-		drawline((ox - LINE_WIDTH/2, 0, ox - LINE_WIDTH/2, oy))
-		drawprose((ox, 0), _yp, (width-ox) * MIDFIT, 'h+-')	
 
 
 	#functors 
-	
-	drawprose((q1x, oy), _x, (width-ox) * WIDEFIT, 'h0-')
-	drawprose((ox, q1y), _y, (oy) * WIDEFIT, 'v0+', font90)
+
+	if (_x != ''):
+		drawline((0, oy, width, oy))
+		drawprose((q1x, oy), _x, (width-ox) * WIDEFIT, 'h0-')
+		
+	if (_y!= ''):
+		drawline((ox - LINE_WIDTH/2, 0, ox - LINE_WIDTH/2, height))
+		drawprose((ox, q1y), _y, (oy) * WIDEFIT, 'v0+', font90)
 	
 	
 	#most efficient shape
 
 	
 	# draw title
-	drawprose((0, 0), _t, ox * MIDFIT, 'h+-')
+	if (_t != ''):
+		drawprose((0, 0), _t, ox * MIDFIT, 'h+-')
 	
 	image.save('diagram.png')
 
 	reset_parameters()
 
 
+
+
+
+
+
+
 # tbt
 
 @bot.tree.command(name='tbt')
 @app_commands.describe(
-	hash = "🗺️.:.⏱️.:.🏞️.:.🏬.:.🌜.:.🌞.:.🌇.:.🌄.:.🌌.:.🌃.:.🥱",
-	_x = "x coordinate",
-	_y = "y coordinate",
-	_xn = "when x is - (left)",
-	_xp = "when x is + (right)",
-	_yn = "when y is - (down)",
-	_yp = "when y is + (up)",
+	hash = "🌇.:.🌄.:.🌌.:.🌃.::.🌞.:.🏞️.:.🌜.:.🏬.:.🗺️.:.⏱️.:.🥱",
 	_1 = "1st quadrant",
 	_2 = "2nd quadrant",
 	_3 = "3rd quadrant",
 	_4 = "4th quadrant",
+	_yp = "when y is + (up)",
+	_xn = "when x is - (left)",
+	_yn = "when y is - (down)",
+	_xp = "when x is + (right)",
+	_x = "x coordinate",
+	_y = "y coordinate",
 	_t = "title of diagram",
-	_pub = "True = publish, otherwise by default only you can see the bot reply",
+	_pub = "True = publish, otherwise by default only you can see the bot reply"
 	#add some more ...
 )
 async def tbt(interaction:discord.Interaction,
 							hash:str=None,
-								_x:str="",
-								_y:str="",
-								_xn:str="",
-								_xp:str="",
-								_yn:str="",
-								_yp:str="",
 								_1:str="",
 								_2:str="",
 								_3:str="",
 								_4:str="",
+								_yp:str="",
+								_xn:str="",
+								_yn:str="",
+								_xp:str="",
+								_x:str="",
+								_y:str="",
 								_t:str="",
 							_pub:bool=False
 						 	):
@@ -348,7 +359,7 @@ async def tbt(interaction:discord.Interaction,
 			)
 	
 		else:
-			hash = await amendhash(hash, [_x, _y, _xn, _xp, _yn, _yp, _1, _2, _3, _4, _t])
+			hash = await amendhash(hash, [_1, _2, _3, _4, _yp, _xn, _yn, _xp, _x, _y, _t])
 			await tofile(hash)
 			# send to discord
 			with open('diagram.png', 'rb') as f:
@@ -412,16 +423,26 @@ async def ml2(interaction:discord.Interaction,
 
 # topology layer under development
 
-@bot.tree.command(name='topos')
-@app_commands.describe(
-	_pub = "under developement"
-)
-async def topos(interaction:discord.Interaction,
-						 _pub:bool=False):
+@bot.tree.command(name='diagram')
+async def diagram(interaction:discord.Interaction, speak:str=""):
 	try:
-		pass
-	
-	
+		matches = re.findall(r"(\w+):\s(\w+)\s(vs.)\s(\w+),\s(\w+)\s(vs.)\s(\w+)", speak)
+
+		if not matches:
+			return
+
+		matches = matches[0]
+
+		hash = HASH_DELIM.join(['', '', '', '', matches[6], matches[1], matches[4], matches[3], '', '', matches[0]])
+		
+		await tofile(['', '', '', '', matches[6], matches[1], matches[4], matches[3], '', '', matches[0]])
+
+		with open('diagram.png', 'rb') as f:
+			await interaction.response.send_message(
+				speak + " -> hash: " + hash,
+				file = discord.File(f)
+			)
+			
 	except Exception as e:
 		if hasattr(interaction, 'author'):
 			await interaction.author.send(e)
