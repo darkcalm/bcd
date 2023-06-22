@@ -2,13 +2,12 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-import PIL
+import PIL # Potential hotfix: font.size if hasattr(font,'size') else font.font.size
 from PIL import Image, ImageDraw, ImageFont
-from pilmoji import Pilmoji
+from pilmoji import Pilmoji  # Allows for handling of emojis in the image creation process
 import emoji
 
-# hotfix pil? (font.size if hasattr(font,'size') else font.font.size)
-
+# Retrieves bot and OpenAI API keys from environment variables.
 import os
 import openai
 import asyncio
@@ -19,13 +18,19 @@ import math
 TOKEN = os.environ['DISCORD_BOT_TOKEN']
 openai.api_key = os.environ['OPENAI_API_KEY']
 
+# Various constants used throughout the bot's functionality.
 PARAM_NUM = 11
-
 HASH_DELIM = '.:.'
 REPLY_DELIM = ','
 BREAK_DELIM = '\n'
-FONT_SIZE_REGEX = r"^font (\d+)(,)*(.*)$"
 DELETION = ['delete', 'd']
+PARAM_OPTIONS = [
+	'_1','_2','_3','_4','_yp','_xn','_yn','_xp','_x','_y','_t',
+	'1','2','3','4','yp','xn','yn','xp','x','y','t',
+] # This uses the % operator to assign values to the parameters
+FONT_SIZE_REGEX = r"^font (\d+)(,)*(.*)$"
+
+# Function to reset various image-related parameters.
 def reset_parameters():
 	global LINE_WIDTH, WIDEFIT, MIDFIT, BACKGROUND_COLOR, FONT_COLOR, FONT_SIZE
 	LINE_WIDTH = 1
@@ -36,89 +41,42 @@ def reset_parameters():
 	FONT_SIZE = 24
 reset_parameters()
 
-bot = commands.Bot(
-	command_prefix='/',
-	intents=discord.Intents.default()
-)
-
-@bot.event
-async def on_ready():
-	try:
-		synced = await bot.tree.sync()
-		print(f"synced {len(synced)} command(s)")
-	except Exception as e:
-		print(e)
-
-@bot.event
-async def on_message(interaction):
-	if interaction.author.id == bot.user.id:
-		return
-
-	if interaction.reference and interaction.channel:
-		target = await interaction.channel.fetch_message(
-			interaction.reference.message_id
-		)
-		if hasattr(target, 'author'):
-			if target.author.id == bot.user.id:
-				if interaction.content in DELETION:
-					await target.delete()
-
-				else:
-					amends = await tohash(interaction.content)
-					if amends == False:
-						await interaction.author.send(
-							"syntax: x label"+REPLY_DELIM+" y spaced label"
-						)
-					
-					else:
-						hash = await amendhash(target.content, amends)
-						await tofile(hash)
-						with open('diagram.png', 'rb') as f:
-							await interaction.channel.send(
-								hash,
-								file = discord.File(f)
-							)	
-			else:
-				pass
-
-#### utility
-
-options = [
-	'_x','_y','_xn','_xp','_yn','_yp','_1','_2','_3','_4','_t',
-	'x','y','xn','xp','yn','yp','1','2','3','4','t'
-]
-
-
+# This function will convert a generic input, which currently may or may not include hash and other commands, into execute and returns a hash format
 async def tohash(hash):
 	if hash is None:
 		return None
 
+	# Check if the input matches the font size formatting pattern, if it does, update the global font size and modify the hash to continue
 	match = re.match(FONT_SIZE_REGEX, hash)
 	if match:
 		global FONT_SIZE
 		FONT_SIZE = int(match.group(1))
 		hash = match.group(3) or HASH_DELIM*(PARAM_NUM-1)
-	
+
+	# If there's only one part and it's correctly formatted as a hash and not a reply, return it
 	cuts = hash.split(REPLY_DELIM)
 	if len(cuts) == 1 and len(hash.split(HASH_DELIM)) > 1:
 		if len(hash.split((HASH_DELIM))) == PARAM_NUM:
 			return hash
 		return False
-		
+
+	# Assuming the reply is formatted as a reply and not a hash, iterate over each part of the input
 	processed = {}
 	for cut in cuts:
 		c = cut.strip(" ").split(" ")
-		if len(c) == 1 or c[0] not in options:
+		# If a cut is not properly spaced or the segment before the first space is not a valid paramter option, return False
+		if len(c) == 1 or c[0] not in PARAM_OPTIONS:
 			return False
 		else:
-			key = options.index(c[0]) % PARAM_NUM
+			key = PARAM_OPTIONS.index(c[0]) % PARAM_NUM
+			# If the key already exists, append the rest of the segment on the next line, if it doesn't exist, create a new entry
 			if key in processed.keys():
 				processed[key] += BREAK_DELIM + " ".join(c[1:])
 			else:
 				processed[key] = " ".join(c[1:])
 
+	# Reconstruct the final hash from the processed inputs
 	hash = ""
-
 	keys = list(processed.keys())
 	values = list(processed.values())
 	for i in range(PARAM_NUM):
@@ -129,40 +87,100 @@ async def tohash(hash):
 	
 	return hash
 
-
-async def amendhash(hash=None, hash2=None):
-	if hash2 == None:
+# If a corresponding item in hash2 is empty, it is assigned with the item from hash
+async def amendhash(hash=None, newhash=None):
+	if newhash == None:
 		return hash
 	if hash == None:
-		if isinstance(hash2, list):
-			return HASH_DELIM.join(hash2)
-		else:
-			return hash2
-	if not isinstance(hash2, list):
-		hash2 = hash2.split(HASH_DELIM)
+		return newhash
 		
+	newhash = newhash.split(HASH_DELIM)	
 	for i, keep in enumerate(hash.split(HASH_DELIM)):
-		if hash2[i] == "":
-			hash2[i] = keep
-	return HASH_DELIM.join(hash2)
+		if newhash[i] == "":
+			newhash[i] = keep
+	return HASH_DELIM.join(newhash)
 
-# big function, needs separation
+# This function will convert a hash into a diagram
+async def tofile(hash:str=""):
+	width, height = 800, 800
+	image = Image.new('RGB', (width, height), color=BACKGROUND_COLOR)
+	draw = ImageDraw.Draw(image)
+	font = ImageFont.truetype('OpenSansEmoji.ttf', FONT_SIZE)
+	font90 = ImageFont.TransposedFont(font, Image.ROTATE_90)
 
-async def tofile(hash):
+	def getw(target):
+		return font.getlength(target)
+	def geth(target):
+		return font.getbbox(target)[3]
+	def drawline(xyxy):
+		draw.line(xyxy, fill=FONT_COLOR)
+	def drawellipse(xyr): #unused
+		r = int(math.sqrt((xyr[0]-xyr[2])**2 + (xyr[1]-xyr[3])**2))
+		xyxy = (xyr[0] - r, xyr[1] - r, xyr[0] + r, xyr[1] + r)
+		draw.ellipse(xyxy, outline=FONT_COLOR)
+	def drawtextdefault(xy, text, font=font):
+		with Pilmoji(image) as pilmoji:
+			pilmoji.text((int(xy[0]), int(xy[1])), text, font=font, fill=FONT_COLOR)
 
+	# This function is used to draw text onto the image, handling automatic line wrapping, alignment, and positioning.
+	def drawprose(xy, text, wrapWidth, anchor, font=font):
+		# Initialize lists to hold the wrapped lines and their heights
+		wrappedLines = []
+		lineHeights = []
+		def appendwrap(text):
+			wrappedLines.append(text)
+			lineHeights.append(geth(text))
 
-	if type(hash) == str:
-		hash = hash.split(HASH_DELIM)
-		preplen = len(hash)
-		if preplen < PARAM_NUM:
-			hash = hash.extend([""]*(PARAM_NUM-preplen))
-		elif preplen > PARAM_NUM:
-			hash = hash[:PARAM_NUM]
+		accumulatedWidth = 0
+		lasti = 0
+		for i in range(len(text)):
+			# If the current character is a newline, wrap the line here
+			if text[i] == '\n':
+				appendwrap(text[lasti:i].strip("\n").strip(" "))
+				appendwrap('\n')
+				lasti = i + 1
+				accumulatedWidth = 0
+			# If the size of the current line plus the width of the next character is less than the wrap size, add the character to the line
+			elif accumulatedWidth + getw(text[i]) < wrapWidth:
+				accumulatedWidth += getw(text[i])
+			else:
+				# If there's only one word on the line, wrap the line before this character
+				accumulatedWidth = 0
+				if len(text[lasti:i].strip(" ").split(" ")) < 2:
+					appendwrap(text[lasti:i].strip(" "))
+					lasti = i
+				# Otherwise, wrap the line at the last space
+				else:
+					append = " ".join(text[lasti:i].strip(" ").split(" ")[:-1])
+					appendwrap(append)
+					lasti = lasti + len(append) + 1
+		# Append any remaining text to the wrap list
+		appendwrap(text[lasti:].strip(" "))
 
-	[_1, _2, _3, _4, _yp, _xn, _yn, _xp, _x, _y, _t] = hash
+		# Determine the starting x and y coordinates for the text based on the anchor parameter
+		totalheight = sum(lineHeights)
+		x, y = {'h-': xy,
+						'h0': (xy[0], xy[1] - totalheight/2),
+						'h+': (xy[0], xy[1] - totalheight),
+						'v-': xy,
+						'v0': (xy[0] - totalheight/2, xy[1]),
+						'v+': (xy[0] - totalheight, xy[1])
+					 } [anchor[0] + anchor[2]]
+
+		# Determine and draw each line of text at the appropriate position based on the anchor parameter
+		for i in range(len(wrappedLines)):
+			drawtextdefault({
+				'h+': (x, y + sum(lineHeights[:i])),
+				'h0': (x - getw(wrappedLines[i])/2, y + sum(lineHeights[:i])),
+				'h-': (x - getw(wrappedLines[i]), y + sum(lineHeights[:i])),
+				'v+': (x + sum(lineHeights[:i]), y - getw(wrappedLines[i])),
+				'v0': (x + sum(lineHeights[:i]), y - getw(wrappedLines[i])/2),
+				'v-': (x + sum(lineHeights[:i]), y)
+				} [anchor[0] + anchor[1]], wrappedLines[i], font=font)
+		pass
 	
-	width = 800
-	height = 800
+	# Setting the canvas dimensions and calculating some key coordinates
+	[_1, _2, _3, _4, _yp, _xn, _yn, _xp, _x, _y, _t] = hash.split(HASH_DELIM)
 	ox = width/2
 	oy = height/2
 	q1x = ox + (width-ox)/2
@@ -174,99 +192,10 @@ async def tofile(hash):
 	q4x = q1x
 	q4y = q3y
 
-	
-	# images
-	image = Image.new('RGB', (width, height), color=BACKGROUND_COLOR)
-	
-	# draws
-	draw = ImageDraw.Draw(image)
-	
-	# fonts
-	font = ImageFont.truetype('OpenSansEmoji.ttf', FONT_SIZE)
-	font90 = ImageFont.TransposedFont(font, Image.ROTATE_90)
-
-	# utilities
-	def getw(target):
-		return font.getlength(target)
-
-	def geth(target):
-		return font.getbbox(target)[3]
-	
-	def drawtextdefault(xy, text, font=font):
-		with Pilmoji(image) as pilmoji:
-			pilmoji.text((int(xy[0]), int(xy[1])), text, font=font, fill=FONT_COLOR)
-
-	def drawprose(xy, text, wrapsize, anchor, font=font):
-		wrap = []
-		lineh = []
-		size = 0
-		lasti = 0
-
-		def appendwrap(text):
-			wrap.append(text)
-			lineh.append(geth(text))
-		
-		for i in range(len(text)):
-
-			if text[i] == '\n':
-				appendwrap(text[lasti:i].strip("\n").strip(" "))
-				appendwrap('\n')
-				lasti = i + 1
-				size = 0
-
-			elif size + getw(text[i]) < wrapsize:
-				size += getw(text[i])
-				
-			else:
-				if len(text[lasti:i].strip(" ").split(" ")) < 2:
-					appendwrap(text[lasti:i].strip(" "))
-					lasti = i
-				else:
-					append = " ".join(text[lasti:i].strip(" ").split(" ")[:-1])
-					appendwrap(append)
-					lasti = lasti + len(append) + 1
-				size = 0
-		appendwrap(text[lasti:].strip(" "))
-
-		totalh = sum(lineh)
-		x, y = {'h-': xy,
-						'h0': (xy[0], xy[1] - totalh/2),
-						'h+': (xy[0], xy[1] - totalh),
-						'v-': xy,
-						'v0': (xy[0] - totalh/2, xy[1]),
-						'v+': (xy[0] - totalh, xy[1])
-					 } [anchor[0] + anchor[2]]
-		
-		for i in range(len(wrap)):
-			drawtextdefault({
-				'h+': (x, y + sum(lineh[:i])),
-				'h0': (x - getw(wrap[i])/2, y + sum(lineh[:i])),
-				'h-': (x - getw(wrap[i]), y + sum(lineh[:i])),
-				'v+': (x + sum(lineh[:i]), y - getw(wrap[i])),
-				'v0': (x + sum(lineh[:i]), y - getw(wrap[i])/2),
-				'v-': (x + sum(lineh[:i]), y)
-				} [anchor[0] + anchor[1]], wrap[i], font=font)
-		pass
-		
-	def drawline(xyxy):
-		draw.line(xyxy, fill=FONT_COLOR)
-
-	def drawcurve(xyr):
-		r = int(math.sqrt((xyr[0]-xyr[2])**2 + (xyr[1]-xyr[3])**2))
-		xyxy = (xyr[0] - r, xyr[1] - r, xyr[0] + r, xyr[1] + r)
-		draw.ellipse(xyxy, outline=FONT_COLOR)		
-
-	#should replace drawing functions with identification and draw after effecient shape is calculated
-
-	#objects
-	
 	drawprose((q1x, q1y), _1, (width-ox) * MIDFIT, 'h00')
 	drawprose((q2x, q2y), _2, (ox) * MIDFIT, 'h00')
 	drawprose((q3x, q3y), _3, (ox) * MIDFIT, 'h00')
 	drawprose((q4x, q4y), _4, (width-ox) * MIDFIT, 'h00')
-
-
-	#morphisms
 
 	if (_yp != ''):
 		drawline((ox - LINE_WIDTH/2, 0, ox - LINE_WIDTH/2, oy))
@@ -284,10 +213,6 @@ async def tofile(hash):
 		drawline((width, oy, ox - LINE_WIDTH/2, oy))
 		drawprose((width, oy), _xp, (width-ox) * MIDFIT, 'h-+')
 	
-
-
-	#functors 
-
 	if (_x != ''):
 		drawline((0, oy, width, oy))
 		drawprose((q1x, oy), _x, (width-ox) * WIDEFIT, 'h0-')
@@ -296,11 +221,6 @@ async def tofile(hash):
 		drawline((ox - LINE_WIDTH/2, 0, ox - LINE_WIDTH/2, height))
 		drawprose((ox, q1y), _y, (oy) * WIDEFIT, 'v0+', font90)
 	
-	
-	#most efficient shape
-
-	
-	# draw title
 	if (_t != ''):
 		drawprose((0, 0), _t, ox * MIDFIT, 'h+-')
 	
@@ -310,13 +230,59 @@ async def tofile(hash):
 
 
 
+# Create the bot object.
+bot = commands.Bot(command_prefix='/',intents=discord.Intents.default())
 
+# Called when the bot is ready and has logged in.
+@bot.event
+async def on_ready():
+	try:
+		synced = await bot.tree.sync()
+		print(f"synced {len(synced)} command(s)")
+	except Exception as e:
+		print(e)
 
+# This event is triggered for every message that the bot can see
+@bot.event
+async def on_message(interaction):
+	# If the bot itself sent the message, do nothing.
+	if interaction.author.id == bot.user.id:
+		return
 
+	# If the message is a reply and it's in a channel
+	if interaction.reference and interaction.channel:
+		# Fetch the message that was replied to
+		target = await interaction.channel.fetch_message(
+			interaction.reference.message_id
+		)
+		if hasattr(target, 'author'):
+			# If the replied message was sent by the bot
+			if target.author.id == bot.user.id:
+				# If the content of the message is a delete command
+				if interaction.content in DELETION:
+					await target.delete()
 
+				else:
+					# Try to convert the message content to a hash, if the conversion failed, send a message with the correct syntax
+					newhash = await tohash(interaction.content)
+					if newhash == False:
+						await interaction.author.send(
+							"syntax: x label"+REPLY_DELIM+" y spaced label"
+						)
+					
+					else:
+						# Amend the hash of the target message and generate a diagram, send the amended hash and the generated diagram in a message
+						hash = await amendhash(target.content, newhash)
+						await tofile(hash)
+						with open('diagram.png', 'rb') as f:
+							await interaction.channel.send(
+								hash,
+								file = discord.File(f)
+							)	
+			else:
+				pass
 
-# tbt
-
+# Command that generates a diagram from a hash
 @bot.tree.command(name='tbt')
 @app_commands.describe(
 	hash = "🌇.:.🌄.:.🌌.:.🌃.::.🌞.:.🏞️.:.🌜.:.🏬.:.🗺️.:.⏱️.:.🥱",
@@ -332,7 +298,6 @@ async def tofile(hash):
 	_y = "y coordinate",
 	_t = "title of diagram",
 	_pub = "True = publish, otherwise by default only you can see the bot reply"
-	#add some more ...
 )
 async def tbt(interaction:discord.Interaction,
 							hash:str=None,
@@ -359,7 +324,7 @@ async def tbt(interaction:discord.Interaction,
 			)
 	
 		else:
-			hash = await amendhash(hash, [_1, _2, _3, _4, _yp, _xn, _yn, _xp, _x, _y, _t])
+			hash = await amendhash(hash, HASH_DELIM.join([_1, _2, _3, _4, _yp, _xn, _yn, _xp, _x, _y, _t]))
 			await tofile(hash)
 			# send to discord
 			with open('diagram.png', 'rb') as f:
@@ -374,56 +339,21 @@ async def tbt(interaction:discord.Interaction,
 			await interaction.author.send(e)
 		else:
 			await interaction.user.send(e)
-
-
-# metaphor layer in development
-
-@bot.tree.command(name='ml2')
-@app_commands.describe(
-	_theme = "basic query parameter",
-	_pub = "under developement"
-)
-async def ml2(interaction:discord.Interaction,
-							_theme:str="loosely related concepts",
-							_pub:bool=False):
-	try:
-
-		await interaction.response.defer(ephemeral = not _pub)
-		await asyncio.sleep(3)
-
-		response = openai.ChatCompletion.create(
-	  	model="gpt-3.5-turbo", # 32K context gpt-4 model: "gpt-4-32k"
-	  	messages=[
-	      {"role": "system", "content": "11 emojis to fill a 2x2 diagram (4 quadrant labels, 4 axis extremes labels, 2 axis labels, 1 title) with the theme of: " + _theme + ". Respond with 11 emojis only."}
-	    ]
-		)
-
-		print(response)
-		hash = ''
-		for c in response.choices[0].message.content:
-			hash += emoji.replace_emoji(c, replace=c+HASH_DELIM)
-		hash = hash.strip(HASH_DELIM).replace("\n","")
-		print(hash)
-
-		global BACKGROUND_COLOR
-		global FONT_COLOR
-		BACKGROUND_COLOR, FONT_COLOR = FONT_COLOR, BACKGROUND_COLOR
-		await tofile(hash)
-		with open('diagram.png', 'rb') as f:
-			BACKGROUND_COLOR, FONT_COLOR = FONT_COLOR, BACKGROUND_COLOR
-			await interaction.followup.send(
-				hash,
-				file = discord.File(f)
-			)
-	
-	except Exception as e:
-		await interaction.followup.send(e)
 	
 
 
-# topology layer under development
 
+
+
+
+
+
+
+### under development: topology layer to generalize tofile()
 @bot.tree.command(name='diagram')
+@app_commands.describe(
+	speak = 'under development, now it only routes to /tbt with the format "2x2: x- vs. x+, y- vs. y+"'
+)
 async def diagram(interaction:discord.Interaction, speak:str=""):
 	try:
 		matches = re.findall(r"(\w+):\s(\w+)\s(vs.)\s(\w+),\s(\w+)\s(vs.)\s(\w+)", speak)
@@ -435,11 +365,11 @@ async def diagram(interaction:discord.Interaction, speak:str=""):
 
 		hash = HASH_DELIM.join(['', '', '', '', matches[6], matches[1], matches[4], matches[3], '', '', matches[0]])
 		
-		await tofile(['', '', '', '', matches[6], matches[1], matches[4], matches[3], '', '', matches[0]])
+		await tofile(hash)
 
 		with open('diagram.png', 'rb') as f:
 			await interaction.response.send_message(
-				speak + " -> hash: " + hash,
+				speak + " -> /tbt hash: " + hash,
 				file = discord.File(f)
 			)
 			
