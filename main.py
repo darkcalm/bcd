@@ -29,16 +29,18 @@ PARAM_OPTIONS = [
 	'1','2','3','4','yp','xn','yn','xp','x','y','t',
 ] # This uses the % operator to assign values to the parameters
 FONT_SIZE_REGEX = r"^font (\d+)(,)*(.*)$"
+MARGIN_REGEX = r"^margin (\d+)(,)*(.*)$"
 
 # Function to reset various image-related parameters.
 def reset_parameters():
-	global LINE_WIDTH, WIDEFIT, MIDFIT, BACKGROUND_COLOR, FONT_COLOR, FONT_SIZE
+	global LINE_WIDTH, WIDEFIT, MIDFIT, BACKGROUND_COLOR, FONT_COLOR, FONT_SIZE, MARGIN
 	LINE_WIDTH = 1
 	WIDEFIT = 1
 	MIDFIT = 0.8
 	BACKGROUND_COLOR = (255,255,255)
 	FONT_COLOR = (0,0,0)
 	FONT_SIZE = 24
+	MARGIN = 84
 reset_parameters()
 
 # This function will convert a generic input, which currently may or may not include hash and other commands, into execute and returns a hash format
@@ -53,6 +55,13 @@ async def tohash(hash):
 		FONT_SIZE = int(match.group(1))
 		hash = match.group(3) or HASH_DELIM*(PARAM_NUM-1)
 
+	# ditto for margins
+	match = re.match(MARGIN_REGEX, hash)
+	if match:
+		global MARGIN
+		MARGIN = int(match.group(1))
+		hash = match.group(3) or HASH_DELIM*(PARAM_NUM-1)
+	
 	# If there's only one part and it's correctly formatted as a hash and not a reply, return it
 	cuts = hash.split(REPLY_DELIM)
 	if len(cuts) == 1 and len(hash.split(HASH_DELIM)) > 1:
@@ -103,7 +112,7 @@ async def amendhash(hash=None, newhash=None):
 # This function will convert a hash into a diagram
 async def tofile(hash:str=""):
 	width, height = 800, 800
-	image = Image.new('RGB', (width, height), color=BACKGROUND_COLOR)
+	image = Image.new('RGB', (width+2*MARGIN, height+2*MARGIN), color=BACKGROUND_COLOR)
 	draw = ImageDraw.Draw(image)
 	font = ImageFont.truetype('OpenSansEmoji.ttf', FONT_SIZE)
 	font90 = ImageFont.TransposedFont(font, Image.ROTATE_90)
@@ -112,16 +121,22 @@ async def tofile(hash:str=""):
 		return font.getlength(target)
 	def geth(target):
 		return font.getbbox(target)[3]
+
+	
+	def drawtextdefault(xy, text, font=font):
+		with Pilmoji(image) as pilmoji:
+			pilmoji.text((int(xy[0])+MARGIN, int(xy[1])+MARGIN), text, font=font, fill=FONT_COLOR)
+			
 	def drawline(xyxy):
-		draw.line(xyxy, fill=FONT_COLOR)
+		draw.line((xyxy[0]+MARGIN,xyxy[1]+MARGIN, xyxy[2]+MARGIN,xyxy[3]+MARGIN), fill=FONT_COLOR)
+
+
 	def drawellipse(xyr): #unused
 		r = int(math.sqrt((xyr[0]-xyr[2])**2 + (xyr[1]-xyr[3])**2))
 		xyxy = (xyr[0] - r, xyr[1] - r, xyr[0] + r, xyr[1] + r)
 		draw.ellipse(xyxy, outline=FONT_COLOR)
-	def drawtextdefault(xy, text, font=font):
-		with Pilmoji(image) as pilmoji:
-			pilmoji.text((int(xy[0]), int(xy[1])), text, font=font, fill=FONT_COLOR)
 
+	
 	# This function is used to draw text onto the image, handling automatic line wrapping, alignment, and positioning.
 	def drawprose(xy, text, wrapWidth, anchor, font=font):
 		# Initialize lists to hold the wrapped lines and their heights
@@ -285,7 +300,7 @@ async def on_message(interaction):
 # Command that generates a diagram from a hash
 @bot.tree.command(name='tbt')
 @app_commands.describe(
-	hash = "🌇.:.🌄.:.🌌.:.🌃.::.🌞.:.🏞️.:.🌜.:.🏬.:.🗺️.:.⏱️.:.🥱",
+	hash = "writing here with the format 🌇.:.🌄.:.🌌.:.🌃.::.🌞.:.🏞️.:.🌜.:.🏬.:.🗺️.:.⏱️.:.🥱 makes the graph directly",
 	_1 = "1st quadrant",
 	_2 = "2nd quadrant",
 	_3 = "3rd quadrant",
@@ -346,73 +361,34 @@ async def tbt(interaction:discord.Interaction,
 
 
 
-
-
-
 ### under development: topology layer to generalize tofile()
-@bot.tree.command(name='diagram')
-@app_commands.describe(
-	speak = 'under development, now it only routes to /tbt with the format "2x2: x- vs. x+, y- vs. y+"'
-)
-async def diagram(interaction:discord.Interaction, speak:str=""):
+@bot.tree.command(name='gram')
+@app_commands.describe(s = 'building now')
+async def gram(interaction:discord.Interaction, s:str=""):
 	try:
-		matches = re.findall(r"(\w+):\s(\w+)\s(vs.)\s(\w+),\s(\w+)\s(vs.)\s(\w+)", speak)
+		pass
+		#matches = re.findall(, speak)
 
-		if not matches:
-			return
+		#if not matches:
+		#	await interaction.response.send_message(
+		#		"incorrect format ... or a bug?",
+		#		ephemeral = True
+		#	)
 
-		matches = matches[0]
-
-		hash = HASH_DELIM.join(['', '', '', '', matches[6], matches[1], matches[4], matches[3], '', '', matches[0]])
+		#matches = matches[0]
 		
-		await tofile(hash)
+		#hash = ""
+		
+		#await tofile("")
 
-		with open('diagram.png', 'rb') as f:
-			await interaction.response.send_message(
-				speak + " -> /tbt hash: " + hash,
-				file = discord.File(f)
-			)
-			
+		#with open('diagram.png', 'rb') as f:
+		#	await interaction.response.send_message(
+		#		hash, file = discord.File(f)
+		#	)
 	except Exception as e:
 		if hasattr(interaction, 'author'):
 			await interaction.author.send(e)
 		else:
 			await interaction.user.send(e)
-
-
-
-
-
-""" gpt preliminary
-import math
-
-def draw_objects(L):
-    # place objects in a circular pattern
-    for i in range(L):
-        angle = 2 * math.pi * i / L
-        place_object(math.cos(angle), math.sin(angle))
-
-def draw_morphisms(M, L):
-    # create a list of all possible object pairs
-    object_pairs = list(combinations(range(L), 2))
-    # sort the pairs by the distance between objects
-    object_pairs.sort(key=lambda pair: abs(pair[0] - pair[1]))
-    # draw morphisms between the first M object pairs
-    for i in range(M):
-        draw_morphism(object_pairs[i])
-
-def draw_functors(N, M):
-    # assign each functor to a morphism
-    for i in range(N):
-        assign_functor_to_morphism(i % M, i)
-
-def draw_graph(L, M, N):
-    draw_objects(L)
-    draw_morphisms(M, L)
-    draw_functors(N, M)
-
-"""
-
-
 
 bot.run(TOKEN)
