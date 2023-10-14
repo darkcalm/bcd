@@ -38,7 +38,7 @@ HASH_SECTION = '//'
 BREAK_CHAR = '\n'
 DELETION = ['delete', 'd']
 
-PO_REGEX = [r"^("+re.escape(item)+") ([^"+HASH_DELIM+"]*)|["+HASH_DELIM+" ]+("+re.escape(item)+") ([^"+HASH_DELIM+"]*)["+HASH_DELIM+" ]*" for item in PO]
+PO_REGEX = [r"^("+re.escape(item)+") ([^"+HASH_DELIM+"]*)|"+HASH_DELIM+" *("+re.escape(item)+") ([^"+HASH_DELIM+"]*)["+HASH_DELIM+" ]*" for item in PO]
 PO_KEY_GROUPNUM = [1, 3]
 PO_VALUE_GROUPNUM = [2, 4]
 HASH_REGEX = r""+HASH_SECTION+(".*"+HASH_DELIM)*(PARAM_NUM-1)+".*"+HASH_SECTION
