@@ -25,26 +25,26 @@ def reset_parameters():
 reset_parameters()
 
 # Various constants used throughout the bot's functionality.
-PARAM_OPTIONS = [
+PO = [
 	'_1','_2','_3','_4','_yp','_xn','_yn','_xp','_x','_y','_t',
 	'1','2','3','4','yp','xn','yn','xp','x','y','t',
 	'font size',
 	'margin'
 ] # Uses the % operator to assign values to parameters in processhash()
 PARAM_NUM = 11
-OPTION_NUM = len(PARAM_OPTIONS) - PARAM_NUM * 2
+OPTION_NUM = len(PO) - PARAM_NUM * 2
 HASH_DELIM = ';'
 HASH_SECTION = '//'
 BREAK_CHAR = '\n'
 DELETION = ['delete', 'd']
 
-STYLE_OPTIONS = [ r"^("+re.escape(item)+") ([^"+HASH_DELIM+"]*)|["+HASH_DELIM+" ]+("+re.escape(item)+") ([^"+HASH_DELIM+"]*)["+HASH_DELIM+" ]*" for item in PARAM_OPTIONS]
-HASH_REGEX = r""+HASH_DELIM+(HASH_DELIM+".*")*11+HASH_SECTION
+PO_REGEX = [r"^("+re.escape(item)+") ([^"+HASH_DELIM+"]*)|["+HASH_DELIM+" ]+("+re.escape(item)+") ([^"+HASH_DELIM+"]*)["+HASH_DELIM+" ]*" for item in PO]
+PO_KEY_GROUPNUM = [1, 3]
+PO_VALUE_GROUPNUM = [2, 4]
+HASH_REGEX = r""+HASH_SECTION+(".*"+HASH_DELIM)*(PARAM_NUM-1)+".*"+HASH_SECTION
 async def striphash(hash):
-	#print("stripped" + HASH_SECTION + hash + HASH_SECTION)
 	return hash[len(HASH_SECTION):-len(HASH_SECTION)]
 async def buildhash(hash):
-	#print("built " + HASH_SECTION + hash + HASH_SECTION)
 	return HASH_SECTION + hash + HASH_SECTION
 
 # This function will convert a generic input, which currently may or may not include hash and other commands, into execute and returns a hash format
@@ -56,16 +56,18 @@ async def processhash(hash):
 	if oldhash is not None:
 		hash = hash.replace(str(oldhash.group()), '')
 		oldhash = oldhash.group()
-
+	
 	processed = {}
 
-	matches = [re.search(regex, hash) for regex in STYLE_OPTIONS]
+	matches = [re.search(regex, hash) for regex in PO_REGEX]
+	if matches == [None]*len(PO_REGEX) and oldhash == None:
+		return False
 	for match in matches:
 		if match is not None:
-			key = match.group(1) or match.group(3)
-			value = match.group(2) or match.group(4)
+			key = next((match.group(n) for n in PO_KEY_GROUPNUM if match.group(n) is not None), None)
+			value = next((match.group(n) for n in PO_VALUE_GROUPNUM if match.group(n) is not None), None)
 
-			if key in PARAM_OPTIONS[-OPTION_NUM:]:
+			if key in PO[-OPTION_NUM:]:
 				if key == "font size":
 					global FONT_SIZE
 					FONT_SIZE = int(value)
@@ -73,8 +75,8 @@ async def processhash(hash):
 					global MARGIN
 					MARGIN = int(value)
 
-			elif key in PARAM_OPTIONS[:-OPTION_NUM]:
-				key = PARAM_OPTIONS.index(key) % PARAM_NUM
+			elif key in PO[:-OPTION_NUM]:
+				key = PO.index(key) % PARAM_NUM
 				if key in processed.keys():
 					processed[key] += BREAK_CHAR + value
 				else:
@@ -94,6 +96,9 @@ async def processhash(hash):
 			hash += HASH_DELIM
 	hash = await buildhash(hash)
 	hash = await amendhash(oldhash, hash)
+
+	#TODO: rebuild options
+	
 	return hash
 
 # If a corresponding item in hash2 is empty, it is assigned with the item from hash
@@ -103,6 +108,8 @@ async def amendhash(hash=None, newhash=None):
 	if hash == None:
 		return newhash
 
+	#TODO: amend options
+	
 	newhash = await striphash(newhash)
 	newhash = newhash.split(HASH_DELIM)	
 	hash = await striphash(hash)
@@ -332,7 +339,6 @@ async def tbt(interaction:discord.Interaction,
 
 		hash = await processhash(hash)
 		if hash == False:
-			#print("processhash false")
 			await interaction.response.send_message(
 				"incorrect format ... or a bug? syntax: x label"+HASH_DELIM+" y label",
 				ephemeral = True
@@ -353,7 +359,7 @@ async def tbt(interaction:discord.Interaction,
 					ephemeral = not _pub
 				)
 
-	except Exception as e:
+	except Exception:
 		if hasattr(interaction, 'author'):
 			await interaction.author.send(
 				"Got a system message 🤖️ contact the developer with:\n" + str(traceback.format_exc())
