@@ -52,7 +52,9 @@ async def tohash(hash):
 		hash = hash.replace(str(oldhash.group()), '')
 
 	processed = {}
+
 	matches = [re.search(regex, hash) for regex in STYLE_OPTIONS]
+
 	for match in matches:
 		if match is not None:
 			option = match.group(1) or match.group(3)
@@ -320,6 +322,7 @@ async def tbt(interaction:discord.Interaction,
 							_pub:bool=False
 							):
 	try:
+
 		hash = await tohash(hash)
 		if hash == False:
 			await interaction.response.send_message(
