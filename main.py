@@ -306,7 +306,7 @@ async def on_message(interaction):
 # Command that generates a diagram from a hash
 @bot.tree.command(name='tbt')
 @app_commands.describe(
-	hash = "format "+HASH_SECTION+"🌇"+HASH_DELIM+"🌄"+HASH_DELIM+"🌌"+HASH_DELIM+"🌃"+HASH_DELIM+"🌞"+HASH_DELIM+"🏞️"+HASH_DELIM+"🌜"+HASH_DELIM+"🏬"+HASH_DELIM+"🗺️"+HASH_DELIM+"⏱️"+HASH_DELIM+"🥱"+HASH_SECTION+" makes the graph directly",
+	hash = HASH_SECTION+"🌇"+HASH_DELIM+"🌄"+HASH_DELIM+"🌌"+HASH_DELIM+"🌃"+HASH_DELIM+"🌞"+HASH_DELIM+"🏞️"+HASH_DELIM+"🌜"+HASH_DELIM+"🏬"+HASH_DELIM+"🗺️"+HASH_DELIM+"⏱️"+HASH_DELIM+"🥱"+HASH_SECTION+" makes a complete graph. x 🗺️"+HASH_DELIM+" y ⏱️ etc. adjusts each label.",
 	_1 = "1st quadrant",
 	_2 = "2nd quadrant",
 	_3 = "3rd quadrant",
