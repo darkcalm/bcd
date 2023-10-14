@@ -5,77 +5,83 @@ from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont
 from pilmoji import Pilmoji
 
-import os, sys
+import os, sys, traceback
 
 import re
-import math
 
 TOKEN = os.environ['DISCORD_BOT_TOKEN']
 
 # Function to reset various image-related parameters.
 def reset_parameters():
-	global LINE_WIDTH, WIDEFIT, MIDFIT, BACKGROUND_COLOR, FONT_COLOR, FONT_SIZE, MARGIN
+	global LINE_WIDTH, WIDEFIT, MIDFIT, BACKGROUND_COLOR, FONT_COLOR
 	LINE_WIDTH = 1
 	WIDEFIT = 1
 	MIDFIT = 0.8
 	BACKGROUND_COLOR = (255,255,255)
 	FONT_COLOR = (0,0,0)
+	global FONT_SIZE, MARGIN
 	FONT_SIZE = 36
 	MARGIN = 84
 reset_parameters()
 
 # Various constants used throughout the bot's functionality.
-PARAM_NUM = 11
-HASH_DELIM = ';'
-BREAK_CHAR = '\n'
-DELETION = ['delete', 'd']
 PARAM_OPTIONS = [
 	'_1','_2','_3','_4','_yp','_xn','_yn','_xp','_x','_y','_t',
 	'1','2','3','4','yp','xn','yn','xp','x','y','t',
 	'font size',
 	'margin'
-] # Uses the % operator to assign values to parameters in tohash()
-STYLE_OPTIONS = [ r"^("+re.escape(item)+") ([^"+HASH_DELIM+"]*)|["+HASH_DELIM+" ]+("+re.escape(item)+") ([^"+HASH_DELIM+"]*)["+HASH_DELIM+" ]*" for item in PARAM_OPTIONS] # Will check separately for every parameters
-HASH_REGEX = r""+HASH_DELIM+(HASH_DELIM+".*")*11+HASH_DELIM*2
+] # Uses the % operator to assign values to parameters in processhash()
+PARAM_NUM = 11
+OPTION_NUM = len(PARAM_OPTIONS) - PARAM_NUM * 2
+HASH_DELIM = ';'
+HASH_SECTION = '//'
+BREAK_CHAR = '\n'
+DELETION = ['delete', 'd']
+
+STYLE_OPTIONS = [ r"^("+re.escape(item)+") ([^"+HASH_DELIM+"]*)|["+HASH_DELIM+" ]+("+re.escape(item)+") ([^"+HASH_DELIM+"]*)["+HASH_DELIM+" ]*" for item in PARAM_OPTIONS]
+HASH_REGEX = r""+HASH_DELIM+(HASH_DELIM+".*")*11+HASH_SECTION
 async def striphash(hash):
-	return hash[2:-2]
+	#print("stripped" + HASH_SECTION + hash + HASH_SECTION)
+	return hash[len(HASH_SECTION):-len(HASH_SECTION)]
 async def buildhash(hash):
-	return HASH_DELIM*2 + hash + HASH_DELIM*2
+	#print("built " + HASH_SECTION + hash + HASH_SECTION)
+	return HASH_SECTION + hash + HASH_SECTION
 
 # This function will convert a generic input, which currently may or may not include hash and other commands, into execute and returns a hash format
-async def tohash(hash):
+async def processhash(hash):
 	if hash is None:
 		return None
 
 	oldhash = re.search(HASH_REGEX, hash)
 	if oldhash is not None:
 		hash = hash.replace(str(oldhash.group()), '')
+		oldhash = oldhash.group()
 
 	processed = {}
 
 	matches = [re.search(regex, hash) for regex in STYLE_OPTIONS]
-
 	for match in matches:
 		if match is not None:
-			option = match.group(1) or match.group(3)
+			key = match.group(1) or match.group(3)
 			value = match.group(2) or match.group(4)
-			if option == "font size":
-				global FONT_SIZE
-				FONT_SIZE = int(value)
-			elif option == "margin":
-				global MARGIN
-				MARGIN = int(value)
 
-			else:
-				key = PARAM_OPTIONS.index(option) % PARAM_NUM
+			if key in PARAM_OPTIONS[-OPTION_NUM:]:
+				if key == "font size":
+					global FONT_SIZE
+					FONT_SIZE = int(value)
+				else:
+					global MARGIN
+					MARGIN = int(value)
+
+			elif key in PARAM_OPTIONS[:-OPTION_NUM]:
+				key = PARAM_OPTIONS.index(key) % PARAM_NUM
 				if key in processed.keys():
-					processed[key] += BREAK_CHAR + str(value)
+					processed[key] += BREAK_CHAR + value
 				else:
 					processed[key] = value
-			hash = hash.replace(match.group(),'')
 
-	if hash.strip() != "":
-		return False
+			else:
+				return False
 
 	# Reconstruct the final hash from the processed inputs
 	hash = ""
@@ -87,7 +93,8 @@ async def tohash(hash):
 		if i != PARAM_NUM - 1:
 			hash += HASH_DELIM
 	hash = await buildhash(hash)
-	return amendhash(oldhash, hash)
+	hash = await amendhash(oldhash, hash)
+	return hash
 
 # If a corresponding item in hash2 is empty, it is assigned with the item from hash
 async def amendhash(hash=None, newhash=None):
@@ -96,7 +103,7 @@ async def amendhash(hash=None, newhash=None):
 	if hash == None:
 		return newhash
 
-	newhash = await striphash(hash)
+	newhash = await striphash(newhash)
 	newhash = newhash.split(HASH_DELIM)	
 	hash = await striphash(hash)
 	for i, keep in enumerate(hash.split(HASH_DELIM)):
@@ -271,7 +278,7 @@ async def on_message(interaction):
 
 				else:
 					# Try to convert the message content to a hash, if the conversion failed, send a message with the correct syntax
-					newhash = await tohash(interaction.content)
+					newhash = await processhash(interaction.content)
 					if newhash == False:
 						await interaction.author.send(
 							"incorrect format ... or a bug? syntax: x label"+HASH_DELIM+" y label"
@@ -292,7 +299,7 @@ async def on_message(interaction):
 # Command that generates a diagram from a hash
 @bot.tree.command(name='tbt')
 @app_commands.describe(
-	hash = "format "+HASH_DELIM*2+"🌇"+HASH_DELIM+"🌄"+HASH_DELIM+"🌌"+HASH_DELIM+"🌃"+HASH_DELIM+"🌞"+HASH_DELIM+"🏞️"+HASH_DELIM+"🌜"+HASH_DELIM+"🏬"+HASH_DELIM+"🗺️"+HASH_DELIM+"⏱️"+HASH_DELIM+"🥱"+HASH_DELIM*2+" makes the graph directly",
+	hash = "format "+HASH_SECTION+"🌇"+HASH_DELIM+"🌄"+HASH_DELIM+"🌌"+HASH_DELIM+"🌃"+HASH_DELIM+"🌞"+HASH_DELIM+"🏞️"+HASH_DELIM+"🌜"+HASH_DELIM+"🏬"+HASH_DELIM+"🗺️"+HASH_DELIM+"⏱️"+HASH_DELIM+"🥱"+HASH_SECTION+" makes the graph directly",
 	_1 = "1st quadrant",
 	_2 = "2nd quadrant",
 	_3 = "3rd quadrant",
@@ -323,8 +330,9 @@ async def tbt(interaction:discord.Interaction,
 							):
 	try:
 
-		hash = await tohash(hash)
+		hash = await processhash(hash)
 		if hash == False:
+			#print("processhash false")
 			await interaction.response.send_message(
 				"incorrect format ... or a bug? syntax: x label"+HASH_DELIM+" y label",
 				ephemeral = True
@@ -346,12 +354,13 @@ async def tbt(interaction:discord.Interaction,
 				)
 
 	except Exception as e:
-		exc_type, exc_obj, exc_tb = sys.exc_info()
-		fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
 		if hasattr(interaction, 'author'):
-			await interaction.author.send("Got a system message 🤖️ contact the developer with: " + str([e, fname, exc_tb.tb_lineno]))
+			await interaction.author.send(
+				"Got a system message 🤖️ contact the developer with:\n" + str(traceback.format_exc())
+			)
 		else:
-			await interaction.user.send("Got a system message 🤖️ contact the developer with: " + str([e, fname, exc_tb.tb_lineno]))
-
+			await interaction.user.send(
+				"Got a system message 🤖️ contact the developer with:\n" + str(traceback.format_exc())
+			)
 
 bot.run(TOKEN)
