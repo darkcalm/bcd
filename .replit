@@ -109,3 +109,5 @@ ignoredPackages = ["unit_tests"]
 
 [deployment]
 run = ["sh", "-c", "python main.py"]
+deploymentTarget = "gce"
+ignorePorts = true
