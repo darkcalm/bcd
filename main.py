@@ -141,9 +141,11 @@ async def text_PIL(xy, text, wrapWidth, anchor, font, margin, PILimage):
 	# Initialize lists to hold the wrapped lines and their heights
 	wrappedLines = []
 	lineHeights = []
+	lineWidths = []
 	async def appendwrap(text):
 		wrappedLines.append(text)
 		lineHeights.append(await geth(text, font))
+		lineWidths.append(await getw(text, font))
 
 	accumulatedWidth = 0
 	lasti = 0
@@ -172,17 +174,18 @@ async def text_PIL(xy, text, wrapWidth, anchor, font, margin, PILimage):
 	# Append any remaining text to the wrap list
 	await appendwrap(text[lasti:].strip(" "))
 
-	# Note the peculiarity in font90 involves lineHeights
+	# Positioning for starting position of first line of text
 	totalheight = sum(lineHeights)
+	totalwidth = max(lineWidths)
 	x, y = {'h-': xy,
 					'h0': (xy[0], xy[1] - totalheight/2),
 					'h+': (xy[0], xy[1] - totalheight),
-					'v-': (xy[0] + lineHeights[0]/2, xy[1]),
-					'v0': (xy[0] - totalheight/2, xy[1]),
-					'v+': (xy[0] - totalheight - lineHeights[-1]/2, xy[1])
+					'v-': (xy[0] + lineWidths[0]/2, xy[1]),
+					'v0': (xy[0] - totalwidth/2, xy[1]),
+					'v+': (xy[0] - totalwidth - lineWidths[-1]/2, xy[1])
 				 } [anchor[0] + anchor[2]]
 	
-	# Determine and draw each line of text at the appropriate position based on the anchor parameter
+	# Positioning for each line of text
 	for i in range(len(wrappedLines)):
 		await text_PIL_base({
 			'h+': (x, y + sum(lineHeights[:i])),
