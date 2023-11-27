@@ -153,7 +153,7 @@ async def line_PIL(xyxy, margin, PILdraw):
                       fill=FONT_COLOR)
 
 
-async def text_PIL(xy, text, wrapWidth, anchor, font, margin, PILimage):
+async def text_PIL(xy, text, wrapSpan, anchor, font, margin, PILimage):
     async def text_PIL_base(xy, text, font, margin):
         with Pilmoji(PILimage) as pilmoji:
             pilmoji.text((int(xy[0]) + margin, int(xy[1]) + margin),
@@ -163,30 +163,31 @@ async def text_PIL(xy, text, wrapWidth, anchor, font, margin, PILimage):
 
     # Initialize lists to hold the wrapped lines and their heights
     wrappedLines = []
-    lineHeights = []
-    lineWidths = []
+    lineDists = []
+    lineSpans = []
+
+    (getspan, getdist) = {'h': (getw, geth), 'v': (geth, getw)}[anchor[0]]
 
     async def appendwrap(text):
+        lineDists.append(await getdist(text, font))
+        lineSpans.append(await getspan(text, font))
         wrappedLines.append(text)
-        lineHeights.append(await geth(text, font))
-        lineWidths.append(await getw(text, font))
 
-    accumulatedWidth = 0
+    span = 0
     lasti = 0
     for i in range(len(text)):
-
         if text[i] == '\n':
             await appendwrap(text[lasti:i].strip("\n").strip(" "))
             await appendwrap('\n')
             lasti = i + 1
-            accumulatedWidth = 0
+            span = 0
 
-        elif accumulatedWidth + await getw(text[i], font) < wrapWidth:
-            accumulatedWidth += await getw(text[i], font)
+        elif span + await getspan(text[i], font) < wrapSpan:
+            span += await getspan(text[i], font)
 
         else:
             # If there's only one word on the line, wrap the line before this character
-            accumulatedWidth = 0
+            span = 0
             if len(text[lasti:i].strip(" ").split(" ")) < 2:
                 await appendwrap(text[lasti:i].strip(" "))
                 lasti = i
@@ -199,32 +200,30 @@ async def text_PIL(xy, text, wrapWidth, anchor, font, margin, PILimage):
     await appendwrap(text[lasti:].strip(" "))
 
     # Positioning for starting position of first line of text
-    totalheight = sum(lineHeights)
-    totalwidth = sum(lineWidths)
+    totalDist = sum(lineDists)
     x, y = {
         'h-': xy,
-        'h0': (xy[0], xy[1] - totalheight / 2),
-        'h+': (xy[0], xy[1] - totalheight),
+        'h0': (xy[0], xy[1] - totalDist / 2),
+        'h+': (xy[0], xy[1] - totalDist),
         'v-': xy,
-        'v0': (xy[0] - totalwidth / 2, xy[1]),
-        'v+': (xy[0] - totalwidth, xy[1])
+        'v0': (xy[0] - totalDist / 2, xy[1]),
+        'v+': (xy[0] - totalDist, xy[1])
     }[anchor[0] + anchor[2]]
 
     # Positioning for each line of text
     for i in range(len(wrappedLines)):
         await text_PIL_base({
-            'h+': (x, y + sum(lineHeights[:i])),
-            'h0': (x - await getw(wrappedLines[i], font) / 2,
-                   y + sum(lineHeights[:i])),
-            'h-': (x - await getw(wrappedLines[i], font),
-									 y + sum(lineHeights[:i])),
-            'v+': (x + sum(lineWidths[:i]), y),
-            'v0': (x + sum(lineWidths[:i]),
-                   y - await geth(wrappedLines[i], font) / 2),
-            'v-': (x + sum(lineWidths[:i]),
-									 y - await geth(wrappedLines[i], font))
+            'h+': (x, y + sum(lineDists[:i])),
+            'h0': (x - lineSpans[i] / 2, y + sum(lineDists[:i])),
+            'h-': (x - lineSpans[i], y + sum(lineDists[:i])),
+            'v+': (x + sum(lineDists[:i]), y),
+            'v0': (x + sum(lineDists[:i]), y - lineSpans[i] / 2),
+            'v-': (x + sum(lineDists[:i]), y - lineSpans[i])
         }[anchor[0] + anchor[1]], wrappedLines[i], font, margin)
     pass
+    
+    return (max(lineSpans), totalDist)
+
 
 
 ####	PIL interface and helpers END ####
@@ -236,6 +235,10 @@ tbt_OPTIONS = [[
     'x:str', 'y:str', 't:str'
 ], ['fontsize:int', 'margin:int']]
 
+tbt_EXE = [
+    [3, 1, 1, 'CW', 'h00'], [1, 1, 1, 'CW', 'h00'], [1, 3, 1, 'CW', 'h00'], [3, 3, 1, 'CW', 'h00'], [4, 2, 1, 'CW', 'h00'], [0, 2, 1, 'CW', 'h00'], [2, 0, 1, 'CW', 'h00'], [2, 4, 1, 'CW', 'h00'], [3, 2, 0, 'CW', 'h0-'], [2, 1, 0, 'CH', 'v0+'], [0, 0, 1, 'CW', 'h+-']
+]
+
 
 async def tbt_tofile(infras):
     infras[1] = [await typedispatchstrict(item) for item in infras[1]]
@@ -246,9 +249,9 @@ async def tbt_tofile(infras):
         infras[1][0], infras[1][1])
 
     # interfaces
-    async def text(xy, text, wrapWidth, anchor, font=font):
+    async def text(xy, text, wrapSpan, anchor, font=font):
         if (text):
-            await text_PIL(xy, str(text), wrapWidth, anchor,
+            return await text_PIL(xy, str(text), wrapSpan, anchor,
                            font90 if anchor[0] == "v" else font, infras[1][1],
                            PILimage)
 
@@ -257,8 +260,8 @@ async def tbt_tofile(infras):
             await line_PIL(xyxy, infras[1][1], PILdraw)
 
     # macros
-    def C44(x, y):
-        return (CW(x, 4), CH(y, 4))
+    def C44(x, y, bx=0, by=0):
+        return (CW(x, 4, bx), CH(y, 4, by))
 
     def FD2(fit, dir):
         return FITS[fit] * dir(1, 2)
@@ -267,26 +270,19 @@ async def tbt_tofile(infras):
         return any([infras[0][i] for i in list])
 
     # micros
-    def CW(n, d):
-        return WIDTH * n / d
+    def CW(n, d, bias=0):
+        return WIDTH * n / d + bias
 
-    def CH(n, d):
-        return HEIGHT * n / d
+    def CH(n, d, bias=0):
+        return HEIGHT * n / d + bias
 
-    # executions
-    await text(C44(3, 1), infras[0][0], FD2(1, CW), 'h00')
-    await text(C44(1, 1), infras[0][1], FD2(1, CW), 'h00')
-    await text(C44(1, 3), infras[0][2], FD2(1, CW), 'h00')
-    await text(C44(3, 3), infras[0][3], FD2(1, CW), 'h00')
-    await text(C44(4, 2), infras[0][4], FD2(1, CW), 'h-+')
-    await text(C44(0, 2), infras[0][5], FD2(1, CW), 'h+-')
-    await text(C44(2, 0), infras[0][6], FD2(1, CW), 'h+-')
-    await text(C44(2, 4), infras[0][7], FD2(1, CW), 'h-+')
-    await text(C44(3, 2), infras[0][8], FD2(0, CW), 'h0-')
-    await text(C44(2, 1), infras[0][9], FD2(0, CH), 'v0+')
-    await text(C44(0, 0), infras[0][10], FD2(1, CW), 'h+-')
-    await line(C44(0, 2) + C44(4, 2), DANY([5, 7, 8]))
-    await line(C44(2, 0) + C44(2, 4), DANY([4, 6, 9]))
+    # execution
+    b = []
+    for i, p in enumerate(tbt_EXE):
+        b.append (await text(C44(p[0], p[1]), infras[0][i], FD2(p[2], eval(p[3])), p[4]))
+  
+    await line(C44(0, 2, bx=b[5][0]) + C44(4, 2, bx=-b[4][0]), DANY([4, 5, 8]))
+    await line(C44(2, 0, by=b[6][1]) + C44(2, 4, by=-b[7][1]), DANY([6, 7, 9]))
 
     PILimage.save('tbt.png')
 
