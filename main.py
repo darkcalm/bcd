@@ -372,7 +372,7 @@ async def on_message(interaction):
 			else:
 				pass
 
-# A helper is used for each slash commands
+# A helper is used for all slash commands
 async def commandhelper(interaction, _pub, _hash, infras, infras0, name):
 	try:	
 		infras_hash = await hashtoinfrasloose(_hash, eval(name+"_OPTIONS"))
