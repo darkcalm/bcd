@@ -397,7 +397,7 @@ async def commandhelper(interaction, _pub, _hash, infras, infras0, name):
 	except Exception:
 		await exceptionhandler(interaction)
 	
-####	 interfaces of helper for discord START ####
+####	 interfaces of helper for discord END ####
 
 
 
