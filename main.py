@@ -104,9 +104,7 @@ from discord.ext import commands
 
 TOKEN = os.environ['DISCORD_BOT_TOKEN']
 
-# Create the bot object.
 bot = commands.Bot(command_prefix='/', intents=discord.Intents.default())
-
 
 @bot.event
 async def on_ready():
@@ -130,8 +128,6 @@ async def exceptionhandler(interaction, message=None):
 COMMANDS = ["tbt"]
 REPLY_DELETE = ['delete', 'd']
 REPLY_COMMENT = ['comment', '#']
-
-
 @bot.event
 async def on_message(interaction):
     if interaction.author.id == bot.user.id:
@@ -270,7 +266,7 @@ def infrastofile_PIL(infras, name, _EXE):
     PILimage, PILdraw, font = getresources_PIL(infras[-1][0], infras[-1][1], infras[-1][2])
 
     # interfaces
-    def text(textwrap, xy, anchor):
+    def text(textwrap, anchor, xy):
         if (textwrap):
             return text_PIL(xy, textwrap, anchor, font, PILimage)
 
@@ -282,36 +278,40 @@ def infrastofile_PIL(infras, name, _EXE):
         return gettextwrap_PIL(
             infras[-2][i], f_wrapspan(_EXE[i][1]), font)
 
-    def gettextsize(i, textwrap):
+    def gettextsize(i):
         return getsize_PIL(gettextwrap(i), font, PILimage)
 
     # macros
-    def f_getlinebias(assignment):
-        [index, transformation] = assignment
-        textsize = gettextsize(index, gettextwrap(index))
-        return tuple(e * t for e, t in zip(textsize, transformation))
 
-    def f_pos(xycoordinates, biasextents = (0,0)):
-        (x, y, bx, by) = xycoordinates + biasextents
-        return (NODE(infras[-1][1], x, 4, bx),
-                NODE(infras[-1][2], y, 4, by))
+    def f_coordinates(xycoordinates, biasextents = (0,0), mode="cartesian4x4"):
+        if mode == "cartesian4x4":
+            (x, y, bx, by) = xycoordinates + biasextents
+            return [f_linear(infras[-1][1], x, 4, bx),
+                    f_linear(infras[-1][2], y, 4, by)]
 
-    def f_wrapspan(basescale): # if there's textmargin add here
-        (b, s) = basescale
-        return NODE(infras[-1][b], s)
+    def f_wrapspan(baseandscale):
+        return infras[-1][baseandscale[0]] * baseandscale[1]
 
-    def f_logic_any(list):
-        return any([infras[-2][i] for i in list])
+    def f_anylabel(l):
+        return any([infras[-2][i] for i in l])
+
+    def f_add(l1, l2):
+        return [l1[i] + l2[i] for i in range(len(l1))]
+
+    def f_mul(l1, l2):
+        return [l1[i] * l2[i] for i in range(len(l1))]
+
+    def f_linear(base, n, d=1, bias=0):
+        return base * n / d + bias
 
     # execution
     for i, _ in enumerate(_EXE):
         if _[0] == 'text':
-            text(
-                gettextwrap(i), f_pos(_[2]),  _[3])
+            text(gettextwrap(i),  _[2], f_coordinates(_[3]))
         elif _[0] == 'line':
-            line(f_logic_any(_[1]),
-                       f_pos(_[2][0], f_getlinebias(_[2][1])) + 
-                       f_pos(_[2][2], f_getlinebias(_[2][3])))
+            line(f_anylabel(_[1]),
+                 f_add(f_mul(gettextsize(_[2][0][0]), _[2][0][1]), f_coordinates(_[3][0])) + 
+                 f_add(f_mul(gettextsize(_[2][1][0]), _[2][1][1]), f_coordinates(_[3][1])))
 
     PILimage.save(name + '.png')
 
@@ -333,13 +333,18 @@ COMMAND_DESCRIPTION_COMMON = {
     "_h": "height",
 }
 
-def NODE(base, n, d=1, bias=0):
-    return base * n / d + bias
+def getoptions(DESCRIPTIONS):
+    return [
+        [key.lstrip('_') for key in DESCRIPTIONS.keys()],
+        [key.lstrip('_') for key in list(COMMAND_DESCRIPTION_COMMON.keys())[2:]],
+    ]
 
 ####    diagram commons END ####
 
 
 ####	 tbt START ####
+
+tbt_NAME = "tbt"
 
 tbt_DESCRIPTIONS = {
     "_1": "top right",
@@ -355,30 +360,27 @@ tbt_DESCRIPTIONS = {
     "_t": "tbt title",
 }
 
-tbt_OPTIONS = [
-    [key.lstrip('_') for key in tbt_DESCRIPTIONS.keys()],
-    [key.lstrip('_') for key in list(COMMAND_DESCRIPTION_COMMON.keys())[2:]],
-]   
+tbt_OPTIONS = getoptions(tbt_DESCRIPTIONS)
 
 tbt_INFRAS0 = [[''] * 11, [42, 800, 800]]
 
-tbt_EXE = [
-    ['text', (1, .5), (3, 1), 'mm'],
-    ['text', (1, .5), (1, 1), 'mm'],
-    ['text', (1, .5), (1, 3), 'mm'],
-    ['text', (1, .5), (3, 3), 'mm'],
-    ['text', (1, .5), (4, 2), 'rm'],
-    ['text', (1, .5), (0, 2), 'lm'],
-    ['text', (1, .5), (2, 0), 'ma'],
-    ['text', (1, .5), (2, 4), 'md'],
-    ['text', (1, .1), (3, 2), 'ma'],
-    ['text', (2, .1), (2, 1), 'ra'],
-    ['text', (1, .2), (0, 0), 'la'],
-    ['line', [4, 5, 8], ((0, 2), [5,(1,0)], (4, 2), [4,(-1,0)])],
-    ['line', [6, 7, 9], ((2, 0), [6,(0,1)], (2, 4), [6,(0,-1)])]
+tbt_EXE = [    # type -> posturing -> drop location
+    ['text', (1, .5), 'mm', (3, 1)],
+    ['text', (1, .5), 'mm', (1, 1)],
+    ['text', (1, .5), 'mm', (1, 3)],
+    ['text', (1, .5), 'mm', (3, 3)],
+    ['text', (1, .5), 'rm', (4, 2)],
+    ['text', (1, .5), 'lm', (0, 2)],
+    ['text', (1, .5), 'ma', (2, 0)],
+    ['text', (1, .5), 'md', (2, 4)],
+    ['text', (1, .1), 'ma', (3, 2)],
+    ['text', (2, .1), 'ra', (2, 1)],
+    ['text', (1, .2), 'la', (0, 0)],
+    ['line', [4, 5, 8], [(5,[1,0]), (4,[-1,0])], [(0, 2), (4, 2)]],
+    ['line', [6, 7, 9], [(6,[0,1]), (7,[0,-1])], [(2, 0), (2, 4)]]
 ]
 
-@bot.tree.command(name='tbt')
+@bot.tree.command(name=tbt_NAME)
 @app_commands.describe(**COMMAND_DESCRIPTION_COMMON, **tbt_DESCRIPTIONS)
 async def tbt(interaction: discord.Interaction,
               _pub: bool = False,
@@ -401,7 +403,7 @@ async def tbt(interaction: discord.Interaction,
     infras = [[_1, _2, _3, _4, _xp, _xn, _yp, _yn, _x, _y, _t],
               [_fs, _w, _h]]
 
-    await commandhelper(interaction, _pub, _seed, infras, tbt_INFRAS0, 'tbt')
+    await commandhelper(interaction, _pub, _seed, infras, tbt_INFRAS0, tbt_NAME)
 
 ####	 tbt END ####
 
