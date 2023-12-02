@@ -412,7 +412,7 @@ tbt_DESCRIPTIONS = [{
     "yn": "when y is - (down)",
     "x": "x axis label",
     "y": "y axis label",
-    "t": "tbt title"
+    "t": "title"
 }, {
     "tw": "tile width, which is the left-right unit distance between labels",
     "th": "tile height, which is the bottom-up unit distance between labels",
