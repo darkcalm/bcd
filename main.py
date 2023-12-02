@@ -21,23 +21,26 @@ def seedtoinfras(_seed, _OPTIONS):
     if _seed is None:
         return None
 
-    strict_format = True
-    infras = _seed.split(SEED_DELIM_SUPRA)
-    if len(infras) == len(_OPTIONS):
+    strict_infras = _seed.split(SEED_DELIM_SUPRA)
+    if len(strict_infras) == len(_OPTIONS):
         for i, optionsect in enumerate(_OPTIONS):
-            infras[i] = infras[i].split(SEED_DELIM_INFRA)
+            strict_infras[i] = strict_infras[i].split(SEED_DELIM_INFRA)
             if isinstance(optionsect, list):
-                if len(infras[i]) != len(optionsect):
-                    strict_format = False
+                if len(strict_infras[i]) != len(optionsect):
+                    strict_infras = None
+                    break
             elif isinstance(optionsect, dict):
-                if len(infras[i]) >= len(optionsect):
-                    strict_format = False
+                if len(strict_infras[i]) != len(optionsect.items()):
+                    strict_infras = None
+                    break
                 else:
-                    infras[i] = infras[i] + [None] * (len(optionsect) - len(infras[i]))
-                    infras[i] = {value: infras[i][j]
+                    strict_infras[i] = {value: strict_infras[i][j]
                                  for j, (key, value) in enumerate(optionsect.items()) }
-    if strict_format:
-        return infras
+    else:
+        strict_infras = None
+        
+    if strict_infras:
+        return strict_infras
 
     # parse and categorize input to parameters and image preferences
     _seed = _seed.replace(SEED_DELIM_SUPRA, SEED_DELIM_INFRA)
@@ -135,7 +138,7 @@ async def on_ready():
 
 
 # A handler is used for ongoing events
-MESSAGE_D = "🤖️ bug or personal? check it out or contact dev with:\n\n"
+MESSAGE_D = "🤖️ bug or typo? check out the command descriptions or contact dev with:\n\n"
 
 
 async def exceptionhandler(interaction, message=None):
@@ -308,9 +311,9 @@ def infrastofile_PIL(infras, name, _EXE):
     def getlineposture(postureparam):
         return f_mul(gettextsize(postureparam[0]), postureparam[1])
 
-    def f_coordinates(xy, mode="cartesian4x4"):
-        if mode == "cartesian4x4":
-            return f_mul(xy, (_width/4, _height/4))
+    def f_coordinates(xy, mode="cartesian"):
+        if mode == "cartesian":
+            return f_mul(xy, (_width/4, _height/4)) # how do we know these "4"
 
     # micros
     def f_linearsizeref(ref):
@@ -342,7 +345,7 @@ def infrastofile_PIL(infras, name, _EXE):
 COMMAND_DESCRIPTION_COMMON = {
     "_pub": "sets if channel sees the bot's reply (default is False)",
     "_seed": "syntax: 1 foo" + SEED_DELIM_INFRA + " 2 bar" + SEED_DELIM_INFRA +
-    " fontsize baz ... in which 1, 2 etc. are command options without prefix",
+        " fontsize baz ... in which 1, 2 etc. are command options without prefix",
     "_w": "width",
     "_h": "height",
     "_fs": "font size"
@@ -359,7 +362,7 @@ def getoptions(DESCRIPTIONS):
 
 ####    diagram commons END ####
 
-####	 tbt START ####
+####    tbt START ####
 
 tbt_NAME = "tbt"
 
@@ -424,7 +427,11 @@ async def tbt(interaction: discord.Interaction,
     await commandhelper(interaction, _pub, _seed, infras, tbt_INFRAS0,
                         tbt_NAME)
 
+####    tbt END ####
 
-####	 tbt END ####
+####    rankedcut START ####
+
+
+####    rankedcut END ####
 
 bot.run(TOKEN)
