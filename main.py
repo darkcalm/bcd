@@ -1,4 +1,4 @@
-####	data structures processing START ####
+####	infrastructure (infras) START ####
 
 import re
 
@@ -25,17 +25,10 @@ def seedtoinfras(_seed, _OPTIONS):
     if len(strict_infras) == len(_OPTIONS):
         for i, optionsect in enumerate(_OPTIONS):
             strict_infras[i] = strict_infras[i].split(SEED_DELIM_INFRA)
-            if isinstance(optionsect, list):
-                if len(strict_infras[i]) != len(optionsect):
-                    strict_infras = None
-                    break
-            elif isinstance(optionsect, dict):
-                if len(strict_infras[i]) != len(optionsect.items()):
-                    strict_infras = None
-                    break
-                else:
-                    strict_infras[i] = {value: strict_infras[i][j]
-                                 for j, (key, value) in enumerate(optionsect.items()) }
+            if len(strict_infras[i]) != len(optionsect):
+                strict_infras = None
+                break
+
     else:
         strict_infras = None
         
@@ -45,24 +38,23 @@ def seedtoinfras(_seed, _OPTIONS):
     # parse and categorize input to parameters and image preferences
     _seed = _seed.replace(SEED_DELIM_SUPRA, SEED_DELIM_INFRA)
     match_bitmap = []
-    match_result = []
     infras = []
     for i, section_params in enumerate(_OPTIONS):
-        match_result.append([])
+        match_result = []
         infras.append([])
 
         for key in section_params:
-            match_result[i].append(re.findall(INFRA_REGEX(key), _seed))
+            match_result.append(re.findall(INFRA_REGEX(key), _seed))
             infras[i].append([])
-
+        # separated for alias keys if any
         for j, key in enumerate(section_params):
-            if match_result[i][j] != []:
-                infras[i][j] = match_result[i][j][-1][INFRA_VALUE_GROUPNUM[
-                    0]] or match_result[i][j][-1][INFRA_VALUE_GROUPNUM[1]]
+            if match_result[j] != []:
+                infras[i][j] = match_result[j][-1][INFRA_VALUE_GROUPNUM[
+                    0]] or match_result[j][-1][INFRA_VALUE_GROUPNUM[1]]
             else:
                 infras[i][j] = None
-
-        match_bitmap.append(match_result[i] != [[]] * len(section_params))
+    
+        match_bitmap.append(match_result != [[]] * len(section_params))
 
     if match_bitmap == [False] * len(_OPTIONS):
         return False
@@ -73,27 +65,17 @@ def amendinfras(oldinfras, newinfras):
     if not (oldinfras and newinfras):
         return oldinfras or newinfras
     for i, section in enumerate(newinfras):
-        if isinstance(section, list):
-            for j, new_value in enumerate(section):
-                if new_value == None:
-                    newinfras[i][j] = oldinfras[i][j]
-        elif isinstance(section, dict):
-            for key, new_value in section.items():
-                if new_value == None:
-                    newinfras[i][key] = oldinfras[i][key]
+        for j, new_value in enumerate(section):
+            if new_value == None:
+                newinfras[i][j] = oldinfras[i][j]
+        
     return newinfras
 
 def infrastoseed(infras):
     _seed = ""
     for i, section in enumerate(infras):
-        if isinstance(section, list):
-            for j, value in enumerate(section):
-                _seed += str(value) + SEED_DELIM_INFRA
-
-        elif isinstance(section, dict):
-            for j, (key, value) in enumerate(section.items()):
-                _seed += str(value) + SEED_DELIM_INFRA
-                
+        for j, value in enumerate(section):
+            _seed += str(value) + SEED_DELIM_INFRA   
         _seed = _seed[:-len(SEED_DELIM_INFRA)]
         _seed += SEED_DELIM_SUPRA
     _seed = _seed[:-len(SEED_DELIM_SUPRA)]
@@ -101,20 +83,15 @@ def infrastoseed(infras):
 
 def typedrive(infras, infras0):
     for i, section in enumerate(infras0):
-        if isinstance(section, list):
-            for j, value in enumerate(section):
-                if isinstance(value, int):
-                    infras[i][j] = int(float(infras[i][j]))
-                elif isinstance(value, str):
-                    infras[i][j] = str(infras[i][j])
-        elif isinstance(section, dict):
-            for key, value in section.items():
-                if isinstance(value, int):
-                    infras[i][key] = int(float(infras[i][key]))
+        for j, value in enumerate(section):
+            if isinstance(value, int):
+                infras[i][j] = int(float(infras[i][j]))
+            elif isinstance(value, str):
+                infras[i][j] = str(infras[i][j])
     return infras
 
 
-####    data structures processing END ####
+####    infrastructure (infras) END ####
 
 ####	 discord START ####
 
@@ -204,6 +181,9 @@ async def commandhelper(interaction, _pub, _seed, infras, infras0, name):
 
 ####    discord END ####
 
+
+
+    
 ####	PIL START ####
 # https://pillow.readthedocs.io/en/stable/handbook/
 from PIL import Image, ImageDraw, ImageFont
@@ -216,9 +196,9 @@ FONT_COLOR = (0, 0, 0)
 LINE_WIDTH = 1
 
 
-def getresources_PIL(width, height, fontsize):
+def getresources_PIL(imagesize, fontsize):
     font = ImageFont.truetype('OpenSansEmoji.ttf', fontsize)
-    PILimage = Image.new('RGB', (width, height), color=BACKGROUND_COLOR)
+    PILimage = Image.new('RGB', imagesize, color=BACKGROUND_COLOR)
     PILdraw = ImageDraw.Draw(PILimage)
     return PILimage, PILdraw, font
 
@@ -276,69 +256,101 @@ def line_PIL(xyxy, PILdraw):
         pass
 
 
-def text_PIL(xy, posture, font, PILimage):
+def text_PIL(xy, anchor, wrappedtext, font, PILimage):
     with Pilmoji(PILimage) as pilmoji:
         pilmoji.text(xy,
-                     anchor=posture[1],
-                     text=posture[0],
+                     anchor=anchor,
+                     text=wrappedtext,
                      font=font,
                      fill=FONT_COLOR)
 
 
 def infrastofile_PIL(infras, name, _EXE):
-    (_width, _height, _fontsize) = infras[-1].values()
+    # notations
+    (_tilewidth, _tileheight, _fontsize) = infras[-1]
     _texts = infras[-2]
     
-    PILimage, PILdraw, PILfont = getresources_PIL(_width, _height, _fontsize)
-
     # interfaces
-    def text(xy, posture):
-        text_PIL(xy, posture, PILfont, PILimage)
+    def text(xy_principle, posture):
+        text_PIL(xy_principle, posture[0], posture[1], PILfont, PILimage)
 
-    def line(xy1, posture1, xy2, posture2):
-        line_PIL(f_add(xy1, posture1) + f_add(xy2, posture2), PILdraw)
+    def line(xy_principle, posture1, xy2, posture2): # principle ~ larger
+        line_PIL(f_add(xy2, posture2) + f_add(xy_principle, posture1), PILdraw)
 
     def gettextsize(i):
-        return getsize_PIL(gettextposture(i)[0], PILfont, PILimage)
+        return getsize_PIL(gettextposture(i)[1], PILfont, PILimage)
 
     # macros
+    def f_coordinates(xy, mode="cartesian"):
+        if mode == "cartesian":
+            return f_mul(xy, (_tilewidth, _tileheight))
+
     def gettextposture(i, postureparam=None):
         if postureparam is None:
             postureparam = _EXE[i]['posture']
-        (spanmax, anchor) = postureparam
-        return (getwrappedtext_PIL(_texts[i], f_linearsizeref(spanmax), PILfont), anchor)
+        (spanmax, singlelineanchor, mutlilineanchor) = postureparam
+        wrappedtext = getwrappedtext_PIL(_texts[i], f_linearsizeref(spanmax), PILfont)
+        return (singlelineanchor, wrappedtext)
 
     def getlineposture(postureparam):
         return f_mul(gettextsize(postureparam[0]), postureparam[1])
-
-    def f_coordinates(xy, mode="cartesian"):
-        if mode == "cartesian":
-            return f_mul(xy, (_width/4, _height/4)) # how do we know these "4"
 
     # micros
     def f_linearsizeref(ref):
         (base, scale) = ref
         return infras[-1][base] * scale
 
+    def f_max(l1, l2):
+        return [max(a, b) for a, b in zip(l1, l2)]
+    
     def f_add(l1, l2):
         return [l1[i] + l2[i] for i in range(len(l1))]
 
     def f_mul(l1, l2):
         return [l1[i] * l2[i] for i in range(len(l1))]
 
-    # execution
+    
+    
+    # resource
+    srcimage = Image.new('RGB', (0, 0))
+    PILimage, PILdraw, PILfont = getresources_PIL(srcimage.size, _fontsize)
+    _EXE_runtime = []
     for i, _ in enumerate(_EXE):
         if _['mode'] == 'text':
-            text(f_coordinates(_['position']),
-                 gettextposture(i, _['posture']))
+            _EXE_runtime.append(
+                {'mode': 'text',
+                 'xy_principle': f_coordinates(_['position']),
+                 'posture': gettextposture(i, _['posture'])})
         elif _['mode'] == 'line':
-            line(f_coordinates(_['position'][0]), getlineposture(_['posture'][0]),
-                 f_coordinates(_['position'][1]), getlineposture(_['posture'][1]))
+            _EXE_runtime.append(
+                {'mode': 'line',
+                 'xy2': f_coordinates(_['position'][0]),
+                 'posture2': getlineposture(_['posture'][0]),
+                 'xy_principle': f_coordinates(_['position'][1]),
+                 'posture1': getlineposture(_['posture'][1])})
+
+        PILimage, PILdraw, PILfont = getresources_PIL(
+            f_max(_EXE_runtime[-1]['xy_principle'], srcimage.size), _fontsize)
+        PILimage.paste(srcimage, (0, 0) + srcimage.size)
+        srcimage = PILimage
+
+    # execution
+    for i, _ in enumerate(_EXE_runtime):
+        if _['mode'] == 'text':
+            del _EXE_runtime[i]['mode']
+            text(**_EXE_runtime[i])
+        elif _['mode'] == 'line':
+            del _EXE_runtime[i]['mode']
+            line(**_EXE_runtime[i])
 
     PILimage.save(name + '.png')
 
 
 ####	PIL END ####
+
+
+
+
 
 ####    diagram commons START ####
 
@@ -346,21 +358,22 @@ COMMAND_DESCRIPTION_COMMON = {
     "_pub": "sets if channel sees the bot's reply (default is False)",
     "_seed": "syntax: 1 foo" + SEED_DELIM_INFRA + " 2 bar" + SEED_DELIM_INFRA +
         " fontsize baz ... in which 1, 2 etc. are command options without prefix",
-    "_w": "width",
-    "_h": "height",
+    "_tw": "tile width",
+    "_th": "tile height",
     "_fs": "font size"
 }
-
 
 def getoptions(DESCRIPTIONS):
     return [
         [key.lstrip('_') for key in DESCRIPTIONS.keys()],
-        {key.lstrip('_') : value.replace(' ','')
-         for (key, value) in list(COMMAND_DESCRIPTION_COMMON.items())[2:]}
+        [key.lstrip('_') for key in list(COMMAND_DESCRIPTION_COMMON.keys())[2:]]
     ]
 
 
 ####    diagram commons END ####
+
+
+
 
 ####    tbt START ####
 
@@ -382,20 +395,20 @@ tbt_DESCRIPTIONS = {
 
 tbt_OPTIONS = getoptions(tbt_DESCRIPTIONS)
 
-tbt_INFRAS0 = [[''] * 11, {"width": 800, "height": 800, "fontsize": 42}]
+tbt_INFRAS0 = [[''] * 11, [200, 200, 42]]
 
 tbt_EXE = [
-    {'mode': 'text', 'position': (3, 1), 'posture': [('width', .5), 'mm']},
-    {'mode': 'text', 'position': (1, 1), 'posture': [('width', .5), 'mm']},
-    {'mode': 'text', 'position': (1, 3), 'posture': [('width', .5), 'mm']},
-    {'mode': 'text', 'position': (3, 3), 'posture': [('width', .5), 'mm']},
-    {'mode': 'text', 'position': (4, 2), 'posture': [('width', .5), 'rm']},
-    {'mode': 'text', 'position': (0, 2), 'posture': [('width', .5), 'lm']},
-    {'mode': 'text', 'position': (2, 0), 'posture': [('width', .5), 'ma']},
-    {'mode': 'text', 'position': (2, 4), 'posture': [('width', .5), 'md']},
-    {'mode': 'text', 'position': (3, 2), 'posture': [('width', .1), 'ma']},
-    {'mode': 'text', 'position': (2, 1), 'posture': [('height', .1), 'ra']},
-    {'mode': 'text', 'position': (0, 0), 'posture': [('width', .2), 'la']},
+    {'mode': 'text', 'position': (3, 1), 'posture': [(0, 2), 'mm', '5']},
+    {'mode': 'text', 'position': (1, 1), 'posture': [(0, 2), 'mm', '5']},
+    {'mode': 'text', 'position': (1, 3), 'posture': [(0, 2), 'mm', '5']},
+    {'mode': 'text', 'position': (3, 3), 'posture': [(0, 2), 'mm', '5']},
+    {'mode': 'text', 'position': (4, 2), 'posture': [(0, 2), 'rm', '6']},
+    {'mode': 'text', 'position': (0, 2), 'posture': [(0, 2), 'lm', '4']},
+    {'mode': 'text', 'position': (2, 0), 'posture': [(0, 2), 'ma', '2']},
+    {'mode': 'text', 'position': (2, 4), 'posture': [(0, 2), 'md', '8']},
+    {'mode': 'text', 'position': (3, 2), 'posture': [(0, .4), 'ma', '2']},
+    {'mode': 'text', 'position': (2, 1), 'posture': [(1, .4), 'ra', '6']},
+    {'mode': 'text', 'position': (0, 0), 'posture': [(0, .8), 'la', '1']},
     {'mode': 'line', 'position': [(0, 2), (4, 2)], 'posture': [(5, [1, 0]), (4, [-1, 0])]},
     {'mode': 'line', 'position': [(2, 0), (2, 4)], 'posture': [(6, [0, 1]), (7, [0, -1])]}
 ]
@@ -417,21 +430,26 @@ async def tbt(interaction: discord.Interaction,
               _x: str = None,
               _y: str = None,
               _t: str = None,
-              _w: int = None,
-              _h: int = None,
+              _tw: int = None,
+              _th: int = None,
               _fs: int = None):
 
     infras = [[_1, _2, _3, _4, _xp, _xn, _yp, _yn, _x, _y, _t],
-              {"width": _w, "height": _h, "fontsize": _fs}]
+              [_tw, _th, _fs]]
 
     await commandhelper(interaction, _pub, _seed, infras, tbt_INFRAS0,
                         tbt_NAME)
 
 ####    tbt END ####
 
+
+
 ####    rankedcut START ####
 
 
+
 ####    rankedcut END ####
+
+
 
 bot.run(TOKEN)
