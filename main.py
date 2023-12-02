@@ -151,26 +151,25 @@ async def on_message(interaction):
                 elif message.attachments:
                     c = message.attachments[0].filename.lower()[:-4]
                     if c in COMMANDS:
-                        infras = seedtoinfras(interaction.content,
+                        infras0 = seedtoinfras(message.content,
                                               eval(c + "_OPTIONS"))
-                        await commandhelper(interaction, True, message.content,
-                                            infras, eval(c + "_INFRAS0"), c)
+                        infras0 = typedrive(infras0, eval(c + "_INFRAS0"))
+                        await commandhelper(
+                            interaction, True, interaction.content, infras0, c)
 
 
 # a helper is used for all slash commands
-MESSAGE_PUBLISH = " (publish with _pub)"
-async def commandhelper(interaction, _pub, _seed, infras, infras0, name):
+async def commandhelper(interaction, _pub, _seed, infras0, name):
     try:
         infras_seed = seedtoinfras(_seed, eval(name + "_OPTIONS"))
-        infras = amendinfras(infras_seed, infras)
-        infras = amendinfras(infras0, infras)  #fallback
+        infras = amendinfras(infras0, infras_seed)  #fallback
         infras = typedrive(infras, infras0)
         infrastofile_PIL(infras, name, eval(name + "_EXE"))
         _seed = infrastoseed(infras)
         with open(name + ".png", 'rb') as f:
             if hasattr(interaction, 'response'):
                 await interaction.response.send_message(
-                    _seed if _pub == True else _seed + MESSAGE_PUBLISH,
+                    _seed if _pub == True else _seed,
                     file=discord.File(f),
                     ephemeral=not _pub)
             else:
@@ -357,46 +356,68 @@ def infrastofile_PIL(infras, name, _EXE):
 
 
 
-####    diagram commons START ####
+####    bcd commons START ####
 
 COMMAND_DESCRIPTION_COMMON = {
-    "_pub": "sets if channel sees the bot's reply (default is False)",
-    "_seed": "syntax: 1 foo" + SEED_DELIM_INFRA + " 2 bar" + SEED_DELIM_INFRA +
-        " fontsize baz ... in which 1, 2 etc. are command options without prefix",
-    "_tw": "tile width, which is the left-right unit distance between labels",
-    "_th": "tile height, which is the bottom-up unit distance between labels",
-    "_fs": "font size"
+    'pubish': "sets if channel sees the bot's reply (default is False)",
+    'tbt_seed': "syntax: 1 foo" + SEED_DELIM_INFRA + " 2 bar" + SEED_DELIM_INFRA +
+        " fs 42 ... type 'info' to see what's available (sent to your dms)",
+    'rankedcut_seed': "under construction 🤖️"
 }
 
+COMMAND_INFO_COMMON_PRE = "🤖️ assignment labels for tbt_seed 🤖️\n\n"
+COMMAND_INFO_COMMON_POST = "\n\n* use a ' ' after any label to start an assignment\n* use a ';' to separate assignments\n* it is possible to reply to bot responses in order to modify or add assignments\n* it is possible to use the text in bot responses as a seed string to publish at the original channel\n* it is recommended that you try things here with the bot, so you can see what's going on, or if it's working according to your needs :)"
+
 def getoptions(DESCRIPTIONS):
-    return [
-        [key.lstrip('_') for key in DESCRIPTIONS.keys()],
-        [key.lstrip('_') for key in list(COMMAND_DESCRIPTION_COMMON.keys())[2:]]
-    ]
+    options = []
+    for section in DESCRIPTIONS:
+        options.append([key.lstrip('_') for key in section.keys()])
+    return options
+
+def getinfo(DESCRIPTIONS):
+    info = []
+    for section in DESCRIPTIONS:
+        info.append("\n".join(
+            [key + ": " + value for (key, value) in section.items()]))
+    return COMMAND_INFO_COMMON_PRE + "\n".join(info) + COMMAND_INFO_COMMON_POST
+
+@bot.tree.command(name='bcd')
+@app_commands.describe(**COMMAND_DESCRIPTION_COMMON)
+async def bcd(interaction: discord.Interaction,
+              pubish: bool = False,
+              tbt_seed: str = None,
+              rankedcut_seed: str = None):
+
+    if tbt_seed == 'info':
+        await interaction.user.send(getinfo(tbt_DESCRIPTIONS))
+        await interaction.response.send_message("check dm :)", ephemeral=True)
+    elif tbt_seed is not None:
+        await commandhelper(interaction, pubish, tbt_seed, tbt_INFRAS0, tbt_NAME)
 
 
-####    diagram commons END ####
-
-
-
+####    bcd commons END ####
 
 ####    tbt START ####
 
 tbt_NAME = "tbt"
 
-tbt_DESCRIPTIONS = {
-    "_1": "top right",
-    "_2": "top left",
-    "_3": "bottom left",
-    "_4": "bottom right",
-    "_xp": "when x is + (right)",
-    "_xn": "when x is - (left)",
-    "_yp": "when y is + (up)",
-    "_yn": "when y is - (down)",
-    "_x": "x axis label",
-    "_y": "y axis label",
-    "_t": "tbt title",
-}
+tbt_DESCRIPTIONS = [{
+    "1": "top right",
+    "2": "top left",
+    "3": "bottom left",
+    "4": "bottom right",
+    "xp": "when x is + (right)",
+    "xn": "when x is - (left)",
+    "yp": "when y is + (up)",
+    "yn": "when y is - (down)",
+    "x": "x axis label",
+    "y": "y axis label",
+    "t": "tbt title"
+}, {
+    "tw": "tile width, which is the left-right unit distance between labels",
+    "th": "tile height, which is the bottom-up unit distance between labels",
+    "fs": "font size"
+}]
 
 tbt_OPTIONS = getoptions(tbt_DESCRIPTIONS)
 
@@ -418,36 +439,7 @@ tbt_EXE = [
     {'mode': 'line', 'position': [(2, 0), (2, 4)], 'posture': [(6, [0, 1]), (7, [0, -1])]}
 ]
 
-
-@bot.tree.command(name=tbt_NAME)
-@app_commands.describe(**COMMAND_DESCRIPTION_COMMON, **tbt_DESCRIPTIONS)
-async def tbt(interaction: discord.Interaction,
-              _pub: bool = False,
-              _seed: str = None,
-              _1: str = None,
-              _2: str = None,
-              _3: str = None,
-              _4: str = None,
-              _xp: str = None,
-              _xn: str = None,
-              _yp: str = None,
-              _yn: str = None,
-              _x: str = None,
-              _y: str = None,
-              _t: str = None,
-              _tw: int = None,
-              _th: int = None,
-              _fs: int = None):
-
-    infras = [[_1, _2, _3, _4, _xp, _xn, _yp, _yn, _x, _y, _t],
-              [_tw, _th, _fs]]
-
-    await commandhelper(interaction, _pub, _seed, infras, tbt_INFRAS0,
-                        tbt_NAME)
-
 ####    tbt END ####
-
-
 
 ####    rankedcut START ####
 
