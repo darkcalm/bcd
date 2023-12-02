@@ -272,13 +272,17 @@ def infrastofile_PIL(infras, name, _EXE):
     
     # interfaces
     def text(xy_principle, posture):
-        text_PIL(xy_principle, posture[0], posture[1], PILfont, PILimage)
+        text_PIL(f_add(xy_principle, posture[2]),
+                 posture[0], posture[1], PILfont, PILimage)
 
     def line(xy_principle, posture1, xy2, posture2): # principle ~ larger
         line_PIL(f_add(xy2, posture2) + f_add(xy_principle, posture1), PILdraw)
 
-    def gettextsize(i):
-        return getsize_PIL(gettextposture(i)[1], PILfont, PILimage)
+    def gettextsize(indexortext):
+        if isinstance(indexortext, int):
+            return getsize_PIL(gettextposture(indexortext)[1], PILfont, PILimage)
+        if isinstance(indexortext, str):
+            return getsize_PIL(indexortext, PILfont, PILimage)
 
     # macros
     def f_coordinates(xy, mode="cartesian"):
@@ -288,9 +292,10 @@ def infrastofile_PIL(infras, name, _EXE):
     def gettextposture(i, postureparam=None):
         if postureparam is None:
             postureparam = _EXE[i]['posture']
-        (spanmax, singlelineanchor, mutlilineanchor) = postureparam
+        (spanmax, singlelineanchor, multilinevector) = postureparam
         wrappedtext = getwrappedtext_PIL(_texts[i], f_linearsizeref(spanmax), PILfont)
-        return (singlelineanchor, wrappedtext)
+        multilinevector = f_mul(gettextsize(wrappedtext), multilinevector)
+        return (singlelineanchor, wrappedtext, multilinevector)
 
     def getlineposture(postureparam):
         return f_mul(gettextsize(postureparam[0]), postureparam[1])
@@ -358,8 +363,8 @@ COMMAND_DESCRIPTION_COMMON = {
     "_pub": "sets if channel sees the bot's reply (default is False)",
     "_seed": "syntax: 1 foo" + SEED_DELIM_INFRA + " 2 bar" + SEED_DELIM_INFRA +
         " fontsize baz ... in which 1, 2 etc. are command options without prefix",
-    "_tw": "tile width",
-    "_th": "tile height",
+    "_tw": "tile width, which is the left-right unit distance between labels",
+    "_th": "tile height, which is the bottom-up unit distance between labels",
     "_fs": "font size"
 }
 
@@ -395,20 +400,20 @@ tbt_DESCRIPTIONS = {
 
 tbt_OPTIONS = getoptions(tbt_DESCRIPTIONS)
 
-tbt_INFRAS0 = [[''] * 11, [200, 200, 42]]
+tbt_INFRAS0 = [[''] * 11, [200, 200, 24]]
 
 tbt_EXE = [
-    {'mode': 'text', 'position': (3, 1), 'posture': [(0, 2), 'mm', '5']},
-    {'mode': 'text', 'position': (1, 1), 'posture': [(0, 2), 'mm', '5']},
-    {'mode': 'text', 'position': (1, 3), 'posture': [(0, 2), 'mm', '5']},
-    {'mode': 'text', 'position': (3, 3), 'posture': [(0, 2), 'mm', '5']},
-    {'mode': 'text', 'position': (4, 2), 'posture': [(0, 2), 'rm', '6']},
-    {'mode': 'text', 'position': (0, 2), 'posture': [(0, 2), 'lm', '4']},
-    {'mode': 'text', 'position': (2, 0), 'posture': [(0, 2), 'ma', '2']},
-    {'mode': 'text', 'position': (2, 4), 'posture': [(0, 2), 'md', '8']},
-    {'mode': 'text', 'position': (3, 2), 'posture': [(0, .4), 'ma', '2']},
-    {'mode': 'text', 'position': (2, 1), 'posture': [(1, .4), 'ra', '6']},
-    {'mode': 'text', 'position': (0, 0), 'posture': [(0, .8), 'la', '1']},
+    {'mode': 'text', 'position': (3, 1), 'posture': [(0, 2), 'mm', (0, -1/4)]},
+    {'mode': 'text', 'position': (1, 1), 'posture': [(0, 2), 'mm', (0, -1/4)]},
+    {'mode': 'text', 'position': (1, 3), 'posture': [(0, 2), 'mm', (0, -1/4)]},
+    {'mode': 'text', 'position': (3, 3), 'posture': [(0, 2), 'mm', (0, -1/4)]},
+    {'mode': 'text', 'position': (4, 2), 'posture': [(0, 2), 'rm', (0, -1/4)]},
+    {'mode': 'text', 'position': (0, 2), 'posture': [(0, 2), 'lm', (0, -1/4)]},
+    {'mode': 'text', 'position': (2, 0), 'posture': [(0, 2), 'ma', (0, 0)]},
+    {'mode': 'text', 'position': (2, 4), 'posture': [(0, 2), 'md', (0, 0)]},
+    {'mode': 'text', 'position': (3, 2), 'posture': [(0, 1), 'ra', (0, 0)]},
+    {'mode': 'text', 'position': (2, 1), 'posture': [(0, .5), 'ra', (0, 0)]},
+    {'mode': 'text', 'position': (0, 0), 'posture': [(0, 2), 'la', (0, 0)]},
     {'mode': 'line', 'position': [(0, 2), (4, 2)], 'posture': [(5, [1, 0]), (4, [-1, 0])]},
     {'mode': 'line', 'position': [(2, 0), (2, 4)], 'posture': [(6, [0, 1]), (7, [0, -1])]}
 ]
