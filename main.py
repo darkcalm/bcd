@@ -5,34 +5,13 @@ import re
 SEED_DELIM_SUPRA = '//'
 SEED_DELIM_INFRA = ';'
 
+# regex ex. ^(1) ([^;]*)|; *(1) ([^;]*)[; ]* for seed strings ex. 1 good; or 1 bad
 def INFRA_REGEX(param_name):
     return r"^(" + re.escape(
         param_name
     ) + ") ([^" + SEED_DELIM_INFRA + "]*)|" + SEED_DELIM_INFRA + " *(" + re.escape(
         param_name
-    ) + ") ([^" + SEED_DELIM_INFRA + "]*)[" + SEED_DELIM_INFRA + " ]*"  # ^(1) ([^;]*)|; *(1) ([^;]*)[; ]*
-
-def amendinfras(oldinfras, newinfras):
-    if not (oldinfras and newinfras):
-        return oldinfras or newinfras
-    for i, section in enumerate(newinfras):
-        for j, new_value in enumerate(section):
-            if new_value == None:
-                newinfras[i][j] = oldinfras[i][j]
-    return newinfras
-
-
-def infrastoseed(infras):
-    _seed = ""
-    for i, section in enumerate(infras):
-        for j, value in enumerate(section):
-            if value is not None:
-                _seed += str(value)
-            _seed += SEED_DELIM_INFRA
-        _seed = _seed[:-len(SEED_DELIM_INFRA)]
-        _seed += SEED_DELIM_SUPRA
-    _seed = _seed[:-len(SEED_DELIM_SUPRA)]
-    return _seed
+    ) + ") ([^" + SEED_DELIM_INFRA + "]*)[" + SEED_DELIM_INFRA + " ]*" 
 
 
 INFRA_VALUE_GROUPNUM = [1, 3]
@@ -42,20 +21,26 @@ def seedtoinfras(_seed, _OPTIONS):
     if _seed is None:
         return None
 
-    # assume a strict compact form first
+    strict_format = True
     infras = _seed.split(SEED_DELIM_SUPRA)
     if len(infras) == len(_OPTIONS):
-        for i, sections in enumerate(_OPTIONS):
+        for i, optionsect in enumerate(_OPTIONS):
             infras[i] = infras[i].split(SEED_DELIM_INFRA)
-            if len(infras[i]) != len(sections):
-                break;
-
-    if len(infras) == len(_OPTIONS):
+            if isinstance(optionsect, list):
+                if len(infras[i]) != len(optionsect):
+                    strict_format = False
+            elif isinstance(optionsect, dict):
+                if len(infras[i]) >= len(optionsect):
+                    strict_format = False
+                else:
+                    infras[i] = infras[i] + [None] * (len(optionsect) - len(infras[i]))
+                    infras[i] = {value: infras[i][j]
+                                 for j, (key, value) in enumerate(optionsect.items()) }
+    if strict_format:
         return infras
 
-    _seed = _seed.replace(SEED_DELIM_SUPRA, SEED_DELIM_INFRA)
-
     # parse and categorize input to parameters and image preferences
+    _seed = _seed.replace(SEED_DELIM_SUPRA, SEED_DELIM_INFRA)
     match_bitmap = []
     match_result = []
     infras = []
@@ -64,13 +49,13 @@ def seedtoinfras(_seed, _OPTIONS):
         infras.append([])
 
         for key in section_params:
-            match_result[i].append(re.findall(INFRA_REGEX(key),
-                                              _seed))
+            match_result[i].append(re.findall(INFRA_REGEX(key), _seed))
             infras[i].append([])
 
         for j, key in enumerate(section_params):
             if match_result[i][j] != []:
-                infras[i][j] = match_result[i][j][-1][INFRA_VALUE_GROUPNUM[0]] or match_result[i][j][-1][INFRA_VALUE_GROUPNUM[1]]
+                infras[i][j] = match_result[i][j][-1][INFRA_VALUE_GROUPNUM[
+                    0]] or match_result[i][j][-1][INFRA_VALUE_GROUPNUM[1]]
             else:
                 infras[i][j] = None
 
@@ -81,18 +66,52 @@ def seedtoinfras(_seed, _OPTIONS):
 
     return infras
 
+def amendinfras(oldinfras, newinfras):
+    if not (oldinfras and newinfras):
+        return oldinfras or newinfras
+    for i, section in enumerate(newinfras):
+        if isinstance(section, list):
+            for j, new_value in enumerate(section):
+                if new_value == None:
+                    newinfras[i][j] = oldinfras[i][j]
+        elif isinstance(section, dict):
+            for key, new_value in section.items():
+                if new_value == None:
+                    newinfras[i][key] = oldinfras[i][key]
+    return newinfras
+
+def infrastoseed(infras):
+    _seed = ""
+    for i, section in enumerate(infras):
+        if isinstance(section, list):
+            for j, value in enumerate(section):
+                _seed += str(value) + SEED_DELIM_INFRA
+
+        elif isinstance(section, dict):
+            for j, (key, value) in enumerate(section.items()):
+                _seed += str(value) + SEED_DELIM_INFRA
+                
+        _seed = _seed[:-len(SEED_DELIM_INFRA)]
+        _seed += SEED_DELIM_SUPRA
+    _seed = _seed[:-len(SEED_DELIM_SUPRA)]
+    return _seed
+
 def typedrive(infras, infras0):
     for i, section in enumerate(infras0):
-        for j, value in enumerate(section):
-            if isinstance(value, int):
-                infras[i][j] = int(float(infras[i][j]))
-            elif isinstance(value, str):
-                infras[i][j] = str(infras[i][j])
+        if isinstance(section, list):
+            for j, value in enumerate(section):
+                if isinstance(value, int):
+                    infras[i][j] = int(float(infras[i][j]))
+                elif isinstance(value, str):
+                    infras[i][j] = str(infras[i][j])
+        elif isinstance(section, dict):
+            for key, value in section.items():
+                if isinstance(value, int):
+                    infras[i][key] = int(float(infras[i][key]))
     return infras
 
+
 ####    data structures processing END ####
-
-
 
 ####	 discord START ####
 
@@ -114,15 +133,19 @@ async def on_ready():
     except Exception as e:
         print(e)
 
+
 # A handler is used for ongoing events
 MESSAGE_D = "🤖️ bug or personal? check it out or contact dev with:\n\n"
+
+
 async def exceptionhandler(interaction, message=None):
     if message:
         await interaction.author.send(message)
     elif hasattr(interaction, 'author'):
-        await interaction.author.send(MESSAGE_D+str(traceback.format_exc()))
+        await interaction.author.send(MESSAGE_D + str(traceback.format_exc()))
     else:
-        await interaction.user.send(MESSAGE_D+str(traceback.format_exc()))
+        await interaction.user.send(MESSAGE_D + str(traceback.format_exc()))
+
 
 # This event is triggered for every message that the bot can see
 COMMANDS = ["tbt"]
@@ -133,9 +156,9 @@ async def on_message(interaction):
     if interaction.author.id == bot.user.id:
         return
 
-    # If the message is a reply and it's in a channel
     if interaction.reference and interaction.channel:
-        message = await interaction.channel.fetch_message(interaction.reference.message_id)
+        message = await interaction.channel.fetch_message(
+            interaction.reference.message_id)
 
         if hasattr(message, 'author'):
             if message.author.id == bot.user.id:
@@ -148,18 +171,13 @@ async def on_message(interaction):
                 elif message.attachments:
                     c = message.attachments[0].filename.lower()[:-4]
                     if c in COMMANDS:
-                        infras = seedtoinfras(interaction.content, eval(c + "_OPTIONS"))
-                        await commandhelper(
-                            interaction,
-                            True,
-                            message.content,
-                            infras,
-                            eval(c+"_INFRAS0"),
-                            c
-                        )
+                        infras = seedtoinfras(interaction.content,
+                                              eval(c + "_OPTIONS"))
+                        await commandhelper(interaction, True, message.content,
+                                            infras, eval(c + "_INFRAS0"), c)
 
 
-# A helper is used for all slash commands
+# a helper is used for all slash commands
 MESSAGE_PUBLISH = " (publish with _pub)"
 async def commandhelper(interaction, _pub, _seed, infras, infras0, name):
     try:
@@ -173,7 +191,8 @@ async def commandhelper(interaction, _pub, _seed, infras, infras0, name):
             if hasattr(interaction, 'response'):
                 await interaction.response.send_message(
                     _seed if _pub == True else _seed + MESSAGE_PUBLISH,
-                    file=discord.File(f), ephemeral=not _pub)
+                    file=discord.File(f),
+                    ephemeral=not _pub)
             else:
                 await interaction.channel.send(_seed, file=discord.File(f))
 
@@ -181,9 +200,6 @@ async def commandhelper(interaction, _pub, _seed, infras, infras0, name):
         await exceptionhandler(interaction)
 
 ####    discord END ####
-
-
-
 
 ####	PIL START ####
 # https://pillow.readthedocs.io/en/stable/handbook/
@@ -196,12 +212,13 @@ BACKGROUND_COLOR = (255, 255, 255)
 FONT_COLOR = (0, 0, 0)
 LINE_WIDTH = 1
 
-def getresources_PIL(fontsize, width, height):    
+
+def getresources_PIL(width, height, fontsize):
     font = ImageFont.truetype('OpenSansEmoji.ttf', fontsize)
-    PILimage = Image.new('RGB', (width, height),
-                         color=BACKGROUND_COLOR)
+    PILimage = Image.new('RGB', (width, height), color=BACKGROUND_COLOR)
     PILdraw = ImageDraw.Draw(PILimage)
     return PILimage, PILdraw, font
+
 
 # descent: https://levelup.gitconnected.com/how-to-properly-calculate-text-size-in-pil-images-17a2cc6f51fd
 def getsize_PIL(textwrap, font, PILimage):
@@ -209,8 +226,9 @@ def getsize_PIL(textwrap, font, PILimage):
         size = pilmoji.getsize(textwrap, font=font)
         return [size[0], size[1] + font.getmetrics()[1]]
 
-# textwrap is a string with potentially more than 0 line breaks ("\n"). discord input strings shows \\n, so we replace it with \n, alongside other requirements of line change
-def gettextwrap_PIL(text, wrapspan, font):
+
+# textwrapped is a string with potentially some line-breaks ("\n")
+def getwrappedtext_PIL(text, wrapspan, font):
     def getspan(target, font):
         return font.getbbox(target)[2]
 
@@ -221,7 +239,8 @@ def gettextwrap_PIL(text, wrapspan, font):
     span = 0
     lasti = 0
     for i in range(len(text)):
-        if text[i:i+2] == '\\n':
+        # supports manual line breaks \n
+        if text[i:i + 2] == '\\n':
             textwrap.append(text[lasti:i].strip("\n"))
             lasti = i + 2
             span = 0
@@ -244,56 +263,59 @@ def gettextwrap_PIL(text, wrapspan, font):
     textwrap.append(text[lasti:].strip(" "))
     return "\n".join(textwrap)
 
+
 def line_PIL(xyxy, PILdraw):
     try:
-        PILdraw.rectangle([(xyxy[0], xyxy[1]),
-                           (xyxy[2], xyxy[3])],
+        PILdraw.rectangle([(xyxy[0], xyxy[1]), (xyxy[2], xyxy[3])],
                           width=LINE_WIDTH,
                           fill=FONT_COLOR)
-    except ValueError: # when where line starts > where line ends
+    except ValueError:  # when where line starts > where line ends
         pass
 
-def text_PIL(xy, textwrap, anchor, font, PILimage):
+
+def text_PIL(xy, posture, font, PILimage):
     with Pilmoji(PILimage) as pilmoji:
         pilmoji.text(xy,
-                     anchor = anchor,
-                     text = textwrap,
-                     font = font,
-                     fill = FONT_COLOR)
+                     anchor=posture[1],
+                     text=posture[0],
+                     font=font,
+                     fill=FONT_COLOR)
+
 
 def infrastofile_PIL(infras, name, _EXE):
-    # notice the infras[-i]. this is to maintain body-head structures. in diagrams we don't think of diagram settings as primary to diagram content.
-    PILimage, PILdraw, font = getresources_PIL(infras[-1][0], infras[-1][1], infras[-1][2])
+    (_width, _height, _fontsize) = infras[-1].values()
+    _texts = infras[-2]
+    
+    PILimage, PILdraw, PILfont = getresources_PIL(_width, _height, _fontsize)
 
     # interfaces
-    def text(textwrap, anchor, xy):
-        if (textwrap):
-            return text_PIL(xy, textwrap, anchor, font, PILimage)
+    def text(xy, posture):
+        text_PIL(xy, posture, PILfont, PILimage)
 
-    def line(dependency, xyxy):
-        if (dependency):
-            line_PIL(xyxy, PILdraw)
-
-    def gettextwrap(i):
-        return gettextwrap_PIL(
-            infras[-2][i], f_wrapspan(_EXE[i][1]), font)
+    def line(xy1, posture1, xy2, posture2):
+        line_PIL(f_add(xy1, posture1) + f_add(xy2, posture2), PILdraw)
 
     def gettextsize(i):
-        return getsize_PIL(gettextwrap(i), font, PILimage)
+        return getsize_PIL(gettextposture(i)[0], PILfont, PILimage)
 
     # macros
+    def gettextposture(i, postureparam=None):
+        if postureparam is None:
+            postureparam = _EXE[i]['posture']
+        (spanmax, anchor) = postureparam
+        return (getwrappedtext_PIL(_texts[i], f_linearsizeref(spanmax), PILfont), anchor)
 
-    def f_coordinates(xycoordinates, biasextents = (0,0), mode="cartesian4x4"):
+    def getlineposture(postureparam):
+        return f_mul(gettextsize(postureparam[0]), postureparam[1])
+
+    def f_coordinates(xy, mode="cartesian4x4"):
         if mode == "cartesian4x4":
-            (x, y, bx, by) = xycoordinates + biasextents
-            return [f_linear(infras[-1][1], x, 4, bx),
-                    f_linear(infras[-1][2], y, 4, by)]
+            return f_mul(xy, (_width/4, _height/4))
 
-    def f_wrapspan(baseandscale):
-        return infras[-1][baseandscale[0]] * baseandscale[1]
-
-    def f_anylabel(l):
-        return any([infras[-2][i] for i in l])
+    # micros
+    def f_linearsizeref(ref):
+        (base, scale) = ref
+        return infras[-1][base] * scale
 
     def f_add(l1, l2):
         return [l1[i] + l2[i] for i in range(len(l1))]
@@ -301,46 +323,41 @@ def infrastofile_PIL(infras, name, _EXE):
     def f_mul(l1, l2):
         return [l1[i] * l2[i] for i in range(len(l1))]
 
-    def f_linear(base, n, d=1, bias=0):
-        return base * n / d + bias
-
     # execution
     for i, _ in enumerate(_EXE):
-        if _[0] == 'text':
-            text(gettextwrap(i),  _[2], f_coordinates(_[3]))
-        elif _[0] == 'line':
-            line(f_anylabel(_[1]),
-                 f_add(f_mul(gettextsize(_[2][0][0]), _[2][0][1]), f_coordinates(_[3][0])) + 
-                 f_add(f_mul(gettextsize(_[2][1][0]), _[2][1][1]), f_coordinates(_[3][1])))
+        if _['mode'] == 'text':
+            text(f_coordinates(_['position']),
+                 gettextposture(i, _['posture']))
+        elif _['mode'] == 'line':
+            line(f_coordinates(_['position'][0]), getlineposture(_['posture'][0]),
+                 f_coordinates(_['position'][1]), getlineposture(_['posture'][1]))
 
     PILimage.save(name + '.png')
 
 
 ####	PIL END ####
 
-
-
-
-
-
 ####    diagram commons START ####
 
 COMMAND_DESCRIPTION_COMMON = {
     "_pub": "sets if channel sees the bot's reply (default is False)",
-    "_seed": "syntax: 1 foo" + SEED_DELIM_INFRA + " 2 bar" + SEED_DELIM_INFRA + " fontsize baz ... in which 1, 2 etc. are command options without prefix",
-    "_fs": "font size",
+    "_seed": "syntax: 1 foo" + SEED_DELIM_INFRA + " 2 bar" + SEED_DELIM_INFRA +
+    " fontsize baz ... in which 1, 2 etc. are command options without prefix",
     "_w": "width",
     "_h": "height",
+    "_fs": "font size"
 }
+
 
 def getoptions(DESCRIPTIONS):
     return [
         [key.lstrip('_') for key in DESCRIPTIONS.keys()],
-        [key.lstrip('_') for key in list(COMMAND_DESCRIPTION_COMMON.keys())[2:]],
+        {key.lstrip('_') : value.replace(' ','')
+         for (key, value) in list(COMMAND_DESCRIPTION_COMMON.items())[2:]}
     ]
 
-####    diagram commons END ####
 
+####    diagram commons END ####
 
 ####	 tbt START ####
 
@@ -362,23 +379,24 @@ tbt_DESCRIPTIONS = {
 
 tbt_OPTIONS = getoptions(tbt_DESCRIPTIONS)
 
-tbt_INFRAS0 = [[''] * 11, [42, 800, 800]]
+tbt_INFRAS0 = [[''] * 11, {"width": 800, "height": 800, "fontsize": 42}]
 
-tbt_EXE = [    # type -> posturing -> drop location
-    ['text', (1, .5), 'mm', (3, 1)],
-    ['text', (1, .5), 'mm', (1, 1)],
-    ['text', (1, .5), 'mm', (1, 3)],
-    ['text', (1, .5), 'mm', (3, 3)],
-    ['text', (1, .5), 'rm', (4, 2)],
-    ['text', (1, .5), 'lm', (0, 2)],
-    ['text', (1, .5), 'ma', (2, 0)],
-    ['text', (1, .5), 'md', (2, 4)],
-    ['text', (1, .1), 'ma', (3, 2)],
-    ['text', (2, .1), 'ra', (2, 1)],
-    ['text', (1, .2), 'la', (0, 0)],
-    ['line', [4, 5, 8], [(5,[1,0]), (4,[-1,0])], [(0, 2), (4, 2)]],
-    ['line', [6, 7, 9], [(6,[0,1]), (7,[0,-1])], [(2, 0), (2, 4)]]
+tbt_EXE = [
+    {'mode': 'text', 'position': (3, 1), 'posture': [('width', .5), 'mm']},
+    {'mode': 'text', 'position': (1, 1), 'posture': [('width', .5), 'mm']},
+    {'mode': 'text', 'position': (1, 3), 'posture': [('width', .5), 'mm']},
+    {'mode': 'text', 'position': (3, 3), 'posture': [('width', .5), 'mm']},
+    {'mode': 'text', 'position': (4, 2), 'posture': [('width', .5), 'rm']},
+    {'mode': 'text', 'position': (0, 2), 'posture': [('width', .5), 'lm']},
+    {'mode': 'text', 'position': (2, 0), 'posture': [('width', .5), 'ma']},
+    {'mode': 'text', 'position': (2, 4), 'posture': [('width', .5), 'md']},
+    {'mode': 'text', 'position': (3, 2), 'posture': [('width', .1), 'ma']},
+    {'mode': 'text', 'position': (2, 1), 'posture': [('height', .1), 'ra']},
+    {'mode': 'text', 'position': (0, 0), 'posture': [('width', .2), 'la']},
+    {'mode': 'line', 'position': [(0, 2), (4, 2)], 'posture': [(5, [1, 0]), (4, [-1, 0])]},
+    {'mode': 'line', 'position': [(2, 0), (2, 4)], 'posture': [(6, [0, 1]), (7, [0, -1])]}
 ]
+
 
 @bot.tree.command(name=tbt_NAME)
 @app_commands.describe(**COMMAND_DESCRIPTION_COMMON, **tbt_DESCRIPTIONS)
@@ -396,17 +414,17 @@ async def tbt(interaction: discord.Interaction,
               _x: str = None,
               _y: str = None,
               _t: str = None,
-              _fs: int = None,
               _w: int = None,
-              _h: int = None):
+              _h: int = None,
+              _fs: int = None):
 
     infras = [[_1, _2, _3, _4, _xp, _xn, _yp, _yn, _x, _y, _t],
-              [_fs, _w, _h]]
+              {"width": _w, "height": _h, "fontsize": _fs}]
 
-    await commandhelper(interaction, _pub, _seed, infras, tbt_INFRAS0, tbt_NAME)
+    await commandhelper(interaction, _pub, _seed, infras, tbt_INFRAS0,
+                        tbt_NAME)
+
 
 ####	 tbt END ####
-
-
 
 bot.run(TOKEN)
