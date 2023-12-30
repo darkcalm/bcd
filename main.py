@@ -39,6 +39,7 @@ def seedtoinfras(_seed, _OPTIONS):
     _seed = _seed.replace(SEED_DELIM_SUPRA, SEED_DELIM_INFRA)
     match_bitmap = []
     infras = []
+
     for i, section_params in enumerate(_OPTIONS):
         match_result = []
         infras.append([])
@@ -115,7 +116,7 @@ async def on_ready():
 
 
 # A handler is used for ongoing events
-MESSAGE_D = "🤖️ bug or typo? check out the command descriptions or contact dev with:\n\n"
+MESSAGE_D = "🤖️ bug or typo? check command info or contact dev with:\n\n"
 
 
 async def exceptionhandler(interaction, message=None):
@@ -128,7 +129,7 @@ async def exceptionhandler(interaction, message=None):
 
 
 # This event is triggered for every message that the bot can see
-COMMANDS = ["tbt"]
+COMMANDS = ["twobytwo"]
 REPLY_DELETE = ['delete', 'd']
 REPLY_COMMENT = ['comment', '#']
 @bot.event
@@ -159,11 +160,11 @@ async def on_message(interaction):
 
 
 # a helper is used for all slash commands
-async def commandhelper(interaction, _pub, _seed, infras0, name):
+async def commandhelper(interaction, _pub, _seed, name):
     try:
-        infras_seed = seedtoinfras(_seed, eval(name + "_OPTIONS"))
-        infras = amendinfras(infras0, infras_seed)  #fallback
-        infras = typedrive(infras, infras0)
+        infras = seedtoinfras(_seed, eval(name + "_OPTIONS"))
+        infras = amendinfras(eval(name + "_INFRAS0"), infras)  #fallback
+        infras = typedrive(infras, eval(name + "_INFRAS0"))
         infrastofile_PIL(infras, name, eval(name + "_EXE"))
         _seed = infrastoseed(infras)
         with open(name + ".png", 'rb') as f:
@@ -205,7 +206,7 @@ def getresources_PIL(imagesize, fontsize):
 # descent: https://levelup.gitconnected.com/how-to-properly-calculate-text-size-in-pil-images-17a2cc6f51fd
 def getsize_PIL(textwrap, font, PILimage):
     with Pilmoji(PILimage) as pilmoji:
-        size = pilmoji.getsize(textwrap, font=font)
+        size = pilmoji.getsize(textwrap, font=font)    # hotfixed core.py, helpers.py
         return [size[0], size[1] + font.getmetrics()[1]]
 
 
@@ -247,12 +248,7 @@ def getwrappedtext_PIL(text, wrapspan, font):
 
 
 def line_PIL(xyxy, PILdraw):
-    try:
-        PILdraw.rectangle([(xyxy[0], xyxy[1]), (xyxy[2], xyxy[3])],
-                          width=LINE_WIDTH,
-                          fill=FONT_COLOR)
-    except ValueError:  # when where line starts > where line ends
-        pass
+    PILdraw.line([(xyxy[0], xyxy[1]), (xyxy[2], xyxy[3])], width=LINE_WIDTH, fill=FONT_COLOR)
 
 
 def text_PIL(xy, anchor, wrappedtext, font, PILimage):
@@ -292,7 +288,7 @@ def infrastofile_PIL(infras, name, _EXE):
         if postureparam is None:
             postureparam = _EXE[i]['posture']
         (spanmax, singlelineanchor, multilinevector) = postureparam
-        wrappedtext = getwrappedtext_PIL(_texts[i], f_linearsizeref(spanmax), PILfont)
+        wrappedtext = getwrappedtext_PIL(_texts[i], spanmax*_tilewidth, PILfont)
         multilinevector = f_mul(gettextsize(wrappedtext), multilinevector)
         return (singlelineanchor, wrappedtext, multilinevector)
 
@@ -300,10 +296,6 @@ def infrastofile_PIL(infras, name, _EXE):
         return f_mul(gettextsize(postureparam[0]), postureparam[1])
 
     # micros
-    def f_linearsizeref(ref):
-        (base, scale) = ref
-        return infras[-1][base] * scale
-
     def f_max(l1, l2):
         return [max(a, b) for a, b in zip(l1, l2)]
     
@@ -312,6 +304,9 @@ def infrastofile_PIL(infras, name, _EXE):
 
     def f_mul(l1, l2):
         return [l1[i] * l2[i] for i in range(len(l1))]
+
+    def f_int(l):
+        return [int(a) for a in l]
 
     
     
@@ -334,7 +329,7 @@ def infrastofile_PIL(infras, name, _EXE):
                  'posture1': getlineposture(_['posture'][1])})
 
         PILimage, PILdraw, PILfont = getresources_PIL(
-            f_max(_EXE_runtime[-1]['xy_principle'], srcimage.size), _fontsize)
+            f_int(f_max(_EXE_runtime[-1]['xy_principle'], srcimage.size)), _fontsize)
         PILimage.paste(srcimage, (0, 0) + srcimage.size)
         srcimage = PILimage
 
@@ -359,14 +354,17 @@ def infrastofile_PIL(infras, name, _EXE):
 ####    bcd commons START ####
 
 COMMAND_DESCRIPTION_COMMON = {
-    'pubish': "sets if channel sees the bot's reply (default is False)",
-    'tbt_seed': "syntax: 1 foo" + SEED_DELIM_INFRA + " 2 bar" + SEED_DELIM_INFRA +
-        " fs 42 ... type 'info' to see what's available (sent to your dms)",
-    'rankedcut_seed': "under construction 🤖️"
+    'about': "type command name to see what's available for that command (sent to dm)",
+    'twobytwo': "syntax: 1 foo" + SEED_DELIM_INFRA + " 2 bar" + SEED_DELIM_INFRA +
+        " fs 42 ...",
+    'twoofthree': "under construction 🤖️",
+    'publish': "sets if channel sees the bot's reply (default is False)"
 }
 
-COMMAND_INFO_COMMON_PRE = "🤖️ assignment labels for tbt_seed 🤖️\n\n"
-COMMAND_INFO_COMMON_POST = "\n\n* use a ' ' after any label to start an assignment\n* use a ';' to separate assignments\n* it is possible to reply to bot responses in order to modify or add assignments\n* it is possible to use the text in bot responses as a seed string to publish at the original channel\n* it is recommended that you try things here with the bot, so you can see what's going on, or if it's working according to your needs :)"
+COMMAND_INFO_COMMON_POST = "\n\n* use a ' ' after any label to start an assignment\n* use a ';' to separate assignments\n* it is possible to reply to bot responses in order to modify or add assignments\n* it is possible to use the text in bot responses as a seed string to publish at the original channel\n* it its recommended that you try things here with the bot, so you can see what's going on, or if it's working according to your needs :)"
+
+def COMMAND_INFO_COMMON_PRE(name):
+    return "🤖️ command info: " + name + " 🤖️\n\n"
 
 def getoptions(DESCRIPTIONS):
     options = []
@@ -374,34 +372,42 @@ def getoptions(DESCRIPTIONS):
         options.append([key.lstrip('_') for key in section.keys()])
     return options
 
-def getinfo(DESCRIPTIONS):
+def getinfo(name):
     info = []
-    for section in DESCRIPTIONS:
+    for section in eval(name + "_DESCRIPTIONS"):
         info.append("\n".join(
             [key + ": " + value for (key, value) in section.items()]))
-    return COMMAND_INFO_COMMON_PRE + "\n".join(info) + COMMAND_INFO_COMMON_POST
+    return COMMAND_INFO_COMMON_PRE(name) + "\n".join(info) + COMMAND_INFO_COMMON_POST
 
 @bot.tree.command(name='bcd')
 @app_commands.describe(**COMMAND_DESCRIPTION_COMMON)
 async def bcd(interaction: discord.Interaction,
-              pubish: bool = False,
-              tbt_seed: str = None,
-              rankedcut_seed: str = None):
+              about: str = None,
+              twobytwo: str = None,
+              twoofthree: str = None,
+              publish: bool = False):
 
-    if tbt_seed == 'info':
-        await interaction.user.send(getinfo(tbt_DESCRIPTIONS))
+    if about is not None:        
+        await interaction.user.send(getinfo(about))
         await interaction.response.send_message("check dm :)", ephemeral=True)
-    elif tbt_seed is not None:
-        await commandhelper(interaction, pubish, tbt_seed, tbt_INFRAS0, tbt_NAME)
+    
+    elif twobytwo is not None:
+        await commandhelper(interaction, publish, twobytwo, twobytwo_NAME)
+
+    elif twoofthree is not None:
+        await commandhelper(interaction, publish, twoofthree, twoofthree_NAME)
 
 
 ####    bcd commons END ####
 
-####    tbt START ####
+import math
 
-tbt_NAME = "tbt"
+####    twobytwo START ####
 
-tbt_DESCRIPTIONS = [{
+twobytwo_NAME = "twobytwo"
+
+twobytwo_DESCRIPTIONS = [{
+    "t": "title",
     "1": "top right",
     "2": "top left",
     "3": "bottom left",
@@ -411,41 +417,108 @@ tbt_DESCRIPTIONS = [{
     "yp": "when y is + (up)",
     "yn": "when y is - (down)",
     "x": "x axis label",
-    "y": "y axis label",
-    "t": "title"
+    "y": "y axis label"
 }, {
-    "tw": "tile width, which is the left-right unit distance between labels",
-    "th": "tile height, which is the bottom-up unit distance between labels",
+    "tw": "tile width",
+    "th": "tile height",
     "fs": "font size"
 }]
 
-tbt_OPTIONS = getoptions(tbt_DESCRIPTIONS)
+twobytwo_OPTIONS = getoptions(twobytwo_DESCRIPTIONS)
 
-tbt_INFRAS0 = [[''] * 11, [200, 200, 24]]
+twobytwo_INFRAS0 = [[''] * 11, [200, 200, 24]]
 
-tbt_EXE = [
-    {'mode': 'text', 'position': (3, 1), 'posture': [(0, 2), 'mm', (0, -1/4)]},
-    {'mode': 'text', 'position': (1, 1), 'posture': [(0, 2), 'mm', (0, -1/4)]},
-    {'mode': 'text', 'position': (1, 3), 'posture': [(0, 2), 'mm', (0, -1/4)]},
-    {'mode': 'text', 'position': (3, 3), 'posture': [(0, 2), 'mm', (0, -1/4)]},
-    {'mode': 'text', 'position': (4, 2), 'posture': [(0, 2), 'rm', (0, -1/4)]},
-    {'mode': 'text', 'position': (0, 2), 'posture': [(0, 2), 'lm', (0, -1/4)]},
-    {'mode': 'text', 'position': (2, 0), 'posture': [(0, 2), 'ma', (0, 0)]},
-    {'mode': 'text', 'position': (2, 4), 'posture': [(0, 2), 'md', (0, 0)]},
-    {'mode': 'text', 'position': (3, 2), 'posture': [(0, 1), 'ra', (0, 0)]},
-    {'mode': 'text', 'position': (2, 1), 'posture': [(0, .5), 'ra', (0, 0)]},
-    {'mode': 'text', 'position': (0, 0), 'posture': [(0, 2), 'la', (0, 0)]},
-    {'mode': 'line', 'position': [(0, 2), (4, 2)], 'posture': [(5, [1, 0]), (4, [-1, 0])]},
-    {'mode': 'line', 'position': [(2, 0), (2, 4)], 'posture': [(6, [0, 1]), (7, [0, -1])]}
+twobytwo_EXE = [
+    {'mode': 'text', 'position': (0, 0), 'posture': [2, 'la', (0, 0)]},
+    {'mode': 'text', 'position': (3, 1), 'posture': [2, 'mm', (0, 0)]},
+    {'mode': 'text', 'position': (1, 1), 'posture': [2, 'mm', (0, 0)]},
+    {'mode': 'text', 'position': (1, 3), 'posture': [2, 'mm', (0, 0)]},
+    {'mode': 'text', 'position': (3, 3), 'posture': [2, 'mm', (0, 0)]},
+    {'mode': 'text', 'position': (4, 2), 'posture': [2, 'rm', (0, 0)]},
+    {'mode': 'text', 'position': (0, 2), 'posture': [2, 'lm', (0, 0)]},
+    {'mode': 'text', 'position': (2, 0), 'posture': [2, 'ma', (0, 0)]},
+    {'mode': 'text', 'position': (2, 4), 'posture': [2, 'md', (0, 0)]},
+    {'mode': 'text', 'position': (3, 2), 'posture': [1, 'ra', (0, 0)]},
+    {'mode': 'text', 'position': (2, 1), 'posture': [.5, 'ra', (0, 0)]},
+    {'mode': 'line', 'position': [(0, 2), (4, 2)], 'posture': [(6, [1, 0]), (5, [-1, 0])]},
+    {'mode': 'line', 'position': [(2, 0), (2, 4)], 'posture': [(7, [0, 1]), (8, [0, -1])]}
 ]
 
-####    tbt END ####
+####    twobytwo END ####
 
-####    rankedcut START ####
+####    twoofthree START ####
+
+twoofthree_NAME = "twoofthree"
+
+twoofthree_DESCRIPTIONS = [{
+    "t": "title",
+    "u": "up",
+    "l": "left",
+    "r": "right",
+    "-u": "left-right pair",
+    "-l": "right-up pair",
+    "-r": "up-left pair"
+}, {
+    "tw": "tile width",
+    "th": "tile height",
+    "fs": "font size"
+}]
+
+twoofthree_OPTIONS = getoptions(twoofthree_DESCRIPTIONS)
+
+twoofthree_INFRAS0 = [[''] * 7, [200, 200, 24]]
+
+twoofthree_EXE = [
+    {'mode': 'text', 'position': (2.4, 315), 'posture': [2, 'rs', (0, 0)]},
+    {'mode': 'text', 'position': (1, 90), 'posture': [2, 'mt', (0, -1)]},
+    {'mode': 'text', 'position': (1, 210), 'posture': [1, 'rt', (0, 0)]},
+    {'mode': 'text', 'position': (1, 330), 'posture': [1, 'lt', (0, 0)]},
+    {'mode': 'text', 'position': (0.618, 270), 'posture': [1, 'mt', (0, 0)]},
+    {'mode': 'text', 'position': (0.618, 150), 'posture': [1, 'rs', (0, 0)]},
+    {'mode': 'text', 'position': (0.618, 30), 'posture': [1, 'ls', (0, 0)]},
+    {'mode': 'line', 'position': [(1, 210), (1, 330)], 'posture': [(0, [0, 0]), (0, [0, 0])]},
+    {'mode': 'line', 'position': [(1, 330), (1, 90)], 'posture': [(0, [0, 0]), (0, [0, 0])]},
+    {'mode': 'line', 'position': [(1, 90), (1, 210)], 'posture': [(0, [0, 0]), (0, [0, 0])]}
+]
+
+def twoofthree_pre():
+    
+    def twoofthree_helper_0(rtheta):
+        (r, theta) = rtheta
+        return (r * math.cos(theta/180*math.pi), -r * math.sin(theta/180*math.pi))
+    
+    def twoofthree_helper_1(xy, xy0):
+        return (max([abs(xy[0]), abs(xy0[0])]), max([abs(xy[1]), abs(xy0[1])]))
+
+    def f_add(l1, l2):
+        return [l1[i] + l2[i] for i in range(len(l1))]
+    
+    twoofthree_persist = (0, 0)
+    
+    for exe in twoofthree_EXE:
+        if exe['mode'] == 'text':
+            exe['position'] = twoofthree_helper_0(exe['position'])
+            twoofthree_persist = twoofthree_helper_1(exe['position'], twoofthree_persist)
+        elif exe['mode'] == 'line':
+            exe['position'][0] = twoofthree_helper_0(exe['position'][0])
+            exe['position'][1] = twoofthree_helper_0(exe['position'][1])
+            twoofthree_persist = twoofthree_helper_1(exe['position'][0], twoofthree_persist)
+            twoofthree_persist = twoofthree_helper_1(exe['position'][1], twoofthree_persist)
+    
+    for exe in twoofthree_EXE:
+        if exe['mode'] == 'text':
+            exe['position'] = f_add(exe['position'], twoofthree_persist)
+        elif exe['mode'] == 'line':
+            exe['position'][0] = f_add(exe['position'][0], twoofthree_persist)
+            exe['position'][1] = f_add(exe['position'][1], twoofthree_persist)
+    
+    pass
+
+twoofthree_pre()
+
+####    twoofthree END ####
 
 
-
-####    rankedcut END ####
 
 
 
