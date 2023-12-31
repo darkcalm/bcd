@@ -1,15 +1,10 @@
-# Python Discord Bot
+## BCD: basic consultant diagrams (now on discord)
 
-This is a starting point for making your own Discord bot using Python and the [discordpy](https://discordpy.readthedocs.io/) library.
-Read [their getting-started guides](https://discordpy.readthedocs.io/en/stable/#getting-started) to get the most out of this template.
+BCD aims to lower context switching of diagram creation by enabling type-to-diagram interfaces / protocols.
 
-## Getting Started
+* 2024 Q1: support the 16 basic consultant diagrams below
+* 2024 Q2: support svg, try second bot destination (farcaster)
 
-To get set up, you'll need to follow [these bot account setup instructions](https://discordpy.readthedocs.io/en/stable/discord.html),
-and then copy the token for your bot and added it as a secret with the key of `TOKEN` in the "Secrets (Environment variables)" panel.
+Developed through [Summer of Protocols](https://summerofprotocols.com).
 
-## FAQ
-
-If you get the following error message while trying to start the server: `429 Too Many Requests` (accompanied by a lot of HTML code), 
-try the advice given in this Stackoverflow question:
-https://stackoverflow.com/questions/66724687/in-discord-py-how-to-solve-the-error-for-toomanyrequests
+![bcd](https://github.com/darkcalm/bcd/assets/132427921/11db9ab9-b0c2-4136-9a58-6dc0990e23d5)
