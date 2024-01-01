@@ -7,4 +7,4 @@ BCD aims to lower context switching of diagram creation by enabling type-to-diag
 
 Developed through [Summer of Protocols](https://summerofprotocols.com).
 
-![bcd](https://github.com/darkcalm/bcd/assets/132427921/11db9ab9-b0c2-4136-9a58-6dc0990e23d5)
+![bcd](https://github.com/darkcalm/bcd/assets/132427921/3390356a-d178-4c60-b111-89a861fc622b)
