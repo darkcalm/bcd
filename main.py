@@ -165,7 +165,6 @@ async def on_message(interaction):
                             interaction, True, interaction.content, infras0, c)
 
 
-# a helper is used for all slash commands
 async def commandhelper(interaction, _pub, _seed, name):
     try:
         infras = seedtoinfras(_seed, eval(name + "_OPTIONS"))
