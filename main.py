@@ -129,9 +129,10 @@ async def exceptionhandler(interaction, message=None):
 
 
 # This event is triggered for every message that the bot can see
-COMMANDS = ["twobytwo"]
+COMMANDS = ["twobytwo", "twoofthree"]
 REPLY_DELETE = ['delete', 'd']
 REPLY_COMMENT = ['comment', '#']
+REPLY_INFO = ['info', 'i']
 @bot.event
 async def on_message(interaction):
     if interaction.author.id == bot.user.id:
@@ -148,6 +149,11 @@ async def on_message(interaction):
 
                 elif interaction.content in REPLY_COMMENT:
                     pass
+
+                elif interaction.content in REPLY_INFO:
+                    c = message.attachments[0].filename.lower()[:-4]
+                    if c in COMMANDS:
+                        await interaction.channel.send(getinfo(c))
 
                 elif message.attachments:
                     c = message.attachments[0].filename.lower()[:-4]
@@ -354,7 +360,7 @@ def infrastofile_PIL(infras, name, _EXE):
 ####    bcd commons START ####
 
 COMMAND_DESCRIPTION_COMMON = {
-    'about': "type command name to see what's available for that command (sent to dm)",
+    'info': "type command name to see what's available for that command (sent to dm)",
     'twobytwo': "syntax: 1 foo" + SEED_DELIM_INFRA + " 2 bar" + SEED_DELIM_INFRA +
         " fs 42 ...",
     'twoofthree': "under construction 🤖️",
@@ -382,13 +388,13 @@ def getinfo(name):
 @bot.tree.command(name='bcd')
 @app_commands.describe(**COMMAND_DESCRIPTION_COMMON)
 async def bcd(interaction: discord.Interaction,
-              about: str = None,
+              info: str = None,
               twobytwo: str = None,
               twoofthree: str = None,
               publish: bool = False):
 
-    if about is not None:        
-        await interaction.user.send(getinfo(about))
+    if info is not None:        
+        await interaction.user.send(getinfo(info))
         await interaction.response.send_message("check dm :)", ephemeral=True)
     
     elif twobytwo is not None:
