@@ -1,4 +1,4 @@
-####	infrastructure (infras) START ####
+####	query processing START ####
 
 import re
 
@@ -13,68 +13,67 @@ def INFRA_REGEX(param_name):
         param_name
     ) + ") ([^" + SEED_DELIM_INFRA + "]*)[" + SEED_DELIM_INFRA + " ]*" 
 
+QUERY_KEY_GROUPNUM = [0, 2]
+QUERY_VALUE_GROUPNUM = [1, 3]
 
-INFRA_VALUE_GROUPNUM = [1, 3]
-INFRA_KEY_GROUPNUM = [0, 2]
-
-def seedtoinfras(_seed, _OPTIONS):
-    if _seed is None:
+def inputtoquery(_input, _OPTIONS):
+    if _input is None:
         return None
 
-    strict_infras = _seed.split(SEED_DELIM_SUPRA)
-    if len(strict_infras) == len(_OPTIONS):
+    maybe_seed = _input.split(SEED_DELIM_SUPRA)
+    if len(maybe_seed) == len(_OPTIONS):
         for i, optionsect in enumerate(_OPTIONS):
-            strict_infras[i] = strict_infras[i].split(SEED_DELIM_INFRA)
-            if len(strict_infras[i]) != len(optionsect):
-                strict_infras = None
+            maybe_seed[i] = maybe_seed[i].split(SEED_DELIM_INFRA)
+            if len(maybe_seed[i]) != len(optionsect):
+                maybe_seed = None
                 break
 
     else:
-        strict_infras = None
-        
-    if strict_infras:
-        return strict_infras
+        maybe_seed = None
+
+    if maybe_seed:
+        return maybe_seed
 
     # parse and categorize input to parameters and image preferences
-    _seed = _seed.replace(SEED_DELIM_SUPRA, SEED_DELIM_INFRA)
+    _input = _input.replace(SEED_DELIM_SUPRA, SEED_DELIM_INFRA)
     match_bitmap = []
-    infras = []
+    query = []
 
     for i, section_params in enumerate(_OPTIONS):
         match_result = []
-        infras.append([])
+        query.append([])
 
         for key in section_params:
-            match_result.append(re.findall(INFRA_REGEX(key), _seed))
-            infras[i].append([])
+            match_result.append(re.findall(INFRA_REGEX(key), _input))
+            query[i].append([])
         # separated for alias keys if any
         for j, key in enumerate(section_params):
             if match_result[j] != []:
-                infras[i][j] = match_result[j][-1][INFRA_VALUE_GROUPNUM[
-                    0]] or match_result[j][-1][INFRA_VALUE_GROUPNUM[1]]
+                query[i][j] = match_result[j][-1][QUERY_VALUE_GROUPNUM[
+                    0]] or match_result[j][-1][QUERY_VALUE_GROUPNUM[1]]
             else:
-                infras[i][j] = None
-    
+                query[i][j] = None
+
         match_bitmap.append(match_result != [[]] * len(section_params))
 
     if match_bitmap == [False] * len(_OPTIONS):
         return False
 
-    return infras
+    return query
 
-def amendinfras(oldinfras, newinfras):
-    if not (oldinfras and newinfras):
-        return oldinfras or newinfras
-    for i, section in enumerate(newinfras):
+def amendquery(oldquery, newquery):
+    if not (oldquery and newquery):
+        return oldquery or newquery
+    for i, section in enumerate(newquery):
         for j, new_value in enumerate(section):
-            if new_value == None:
-                newinfras[i][j] = oldinfras[i][j]
-        
-    return newinfras
+            if new_value is None:
+                newquery[i][j] = oldquery[i][j]
 
-def infrastoseed(infras):
+    return newquery
+
+def querytoseed(query):
     _seed = ""
-    for i, section in enumerate(infras):
+    for i, section in enumerate(query):
         for j, value in enumerate(section):
             _seed += str(value) + SEED_DELIM_INFRA   
         _seed = _seed[:-len(SEED_DELIM_INFRA)]
@@ -82,17 +81,17 @@ def infrastoseed(infras):
     _seed = _seed[:-len(SEED_DELIM_SUPRA)]
     return _seed
 
-def typedrive(infras, infras0):
-    for i, section in enumerate(infras0):
+def typedrive(query, drive):
+    for i, section in enumerate(drive):
         for j, value in enumerate(section):
             if isinstance(value, int):
-                infras[i][j] = int(float(infras[i][j]))
+                query[i][j] = int(float(query[i][j]))
             elif isinstance(value, str):
-                infras[i][j] = str(infras[i][j])
-    return infras
+                query[i][j] = str(query[i][j])
+    return query
 
 
-####    infrastructure (infras) END ####
+####    query processing END ####
 
 ####	 discord START ####
 
@@ -151,31 +150,31 @@ async def on_message(interaction):
                     pass
 
                 elif interaction.content in REPLY_INFO:
-                    c = message.attachments[0].filename.lower()[:-4]
-                    if c in COMMANDS:
-                        await interaction.channel.send(getinfo(c))
+                    name = message.attachments[0].filename.lower()[:-4]
+                    if name in COMMANDS:
+                        await interaction.channel.send(getinfo(name))
 
                 elif message.attachments:
-                    c = message.attachments[0].filename.lower()[:-4]
-                    if c in COMMANDS:
-                        infras0 = seedtoinfras(message.content,
-                                              eval(c + "_OPTIONS"))
-                        infras0 = typedrive(infras0, eval(c + "_INFRAS0"))
+                    name = message.attachments[0].filename.lower()[:-4]
+                    if name in COMMANDS:
+                        drive = inputtoquery(message.content,
+                                              eval(name + "_OPTIONS"))
+                        drive = typedrive(drive, eval(name + "_DRIVE"))
                         await commandhelper(
-                            interaction, True, interaction.content, infras0, c)
+                            interaction, True, interaction.content, name)
 
 
 async def commandhelper(interaction, _pub, _seed, name):
     try:
-        infras = seedtoinfras(_seed, eval(name + "_OPTIONS"))
-        infras = amendinfras(eval(name + "_INFRAS0"), infras)  #fallback
-        infras = typedrive(infras, eval(name + "_INFRAS0"))
-        infrastofile_PIL(infras, name, eval(name + "_EXE"))
-        _seed = infrastoseed(infras)
+        query = inputtoquery(_seed, eval(name + "_OPTIONS"))
+        query = amendquery(eval(name + "_DRIVE"), query)  # drive acts as fallback
+        query = typedrive(query, eval(name + "_DRIVE"))
+        querytofile_PIL(query, name, eval(name + "_EXE"))
+        _seed = querytoseed(query)
         with open(name + ".png", 'rb') as f:
             if hasattr(interaction, 'response'):
                 await interaction.response.send_message(
-                    _seed if _pub == True else _seed,
+                    _seed if _pub is True else _seed,
                     file=discord.File(f),
                     ephemeral=not _pub)
             else:
@@ -188,7 +187,7 @@ async def commandhelper(interaction, _pub, _seed, name):
 
 
 
-    
+
 ####	PIL START ####
 # https://pillow.readthedocs.io/en/stable/handbook/
 from PIL import Image, ImageDraw, ImageFont
@@ -265,11 +264,11 @@ def text_PIL(xy, anchor, wrappedtext, font, PILimage):
                      fill=FONT_COLOR)
 
 
-def infrastofile_PIL(infras, name, _EXE):
+def querytofile_PIL(query, name, _EXE):
     # notations
-    (_tilewidth, _tileheight, _fontsize) = infras[-1]
-    _texts = infras[-2]
-    
+    (_tilewidth, _tileheight, _fontsize) = query[-1]
+    _texts = query[-2]
+
     # interfaces
     def text(xy_principle, posture):
         text_PIL(f_add(xy_principle, posture[2]),
@@ -279,7 +278,7 @@ def infrastofile_PIL(infras, name, _EXE):
         line_PIL(f_add(xy2, posture2) + f_add(xy_principle, posture1), PILdraw)
 
     def gettextsize(indexortext):
-        if isinstance(indexortext, int):
+        if isinstance(indexortext, int): # index of executing elements
             return getsize_PIL(gettextposture(indexortext)[1], PILfont, PILimage)
         if isinstance(indexortext, str):
             return getsize_PIL(indexortext, PILfont, PILimage)
@@ -303,7 +302,7 @@ def infrastofile_PIL(infras, name, _EXE):
     # micros
     def f_max(l1, l2):
         return [max(a, b) for a, b in zip(l1, l2)]
-    
+
     def f_add(l1, l2):
         return [l1[i] + l2[i] for i in range(len(l1))]
 
@@ -313,8 +312,8 @@ def infrastofile_PIL(infras, name, _EXE):
     def f_int(l):
         return [int(a) for a in l]
 
-    
-    
+
+
     # resource
     srcimage = Image.new('RGB', (0, 0))
     PILimage, PILdraw, PILfont = getresources_PIL(srcimage.size, _fontsize)
@@ -333,6 +332,7 @@ def infrastofile_PIL(infras, name, _EXE):
                  'xy_principle': f_coordinates(_['position'][1]),
                  'posture1': getlineposture(_['posture'][1])})
 
+        # make as big what will be drawn
         PILimage, PILdraw, PILfont = getresources_PIL(
             f_int(f_max(_EXE_runtime[-1]['xy_principle'], srcimage.size)), _fontsize)
         PILimage.paste(srcimage, (0, 0) + srcimage.size)
@@ -387,19 +387,19 @@ def getinfo(name):
 @bot.tree.command(name='bcd')
 @app_commands.describe(**COMMAND_DESCRIPTION_COMMON)
 async def bcd(interaction: discord.Interaction,
-              info: str = None,
-              twobytwo: str = None,
-              twoofthree: str = None,
+              info: str = "",
+              twobytwo: str = "",
+              twoofthree: str = "",
               publish: bool = False):
 
-    if info is not None:        
+    if info != "":        
         await interaction.user.send(getinfo(info))
         await interaction.response.send_message("check dm :)", ephemeral=True)
-    
-    elif twobytwo is not None:
+
+    elif twobytwo != "":
         await commandhelper(interaction, publish, twobytwo, twobytwo_NAME)
 
-    elif twoofthree is not None:
+    elif twoofthree != "":
         await commandhelper(interaction, publish, twoofthree, twoofthree_NAME)
 
 
@@ -431,7 +431,7 @@ twobytwo_DESCRIPTIONS = [{
 
 twobytwo_OPTIONS = getoptions(twobytwo_DESCRIPTIONS)
 
-twobytwo_INFRAS0 = [[''] * 11, [200, 200, 24]]
+twobytwo_DRIVE = [[''] * 11, [200, 200, 24]]
 
 twobytwo_EXE = [
     {'mode': 'text', 'position': (0, 0), 'posture': [2, 'la', (0, 0)]},
@@ -471,7 +471,7 @@ twoofthree_DESCRIPTIONS = [{
 
 twoofthree_OPTIONS = getoptions(twoofthree_DESCRIPTIONS)
 
-twoofthree_INFRAS0 = [[''] * 7, [200, 200, 24]]
+twoofthree_DRIVE = [[''] * 7, [200, 200, 24]]
 
 twoofthree_EXE = [
     {'mode': 'text', 'position': (2.4, 315), 'posture': [2, 'rs', (0, 0)]},
@@ -487,19 +487,19 @@ twoofthree_EXE = [
 ]
 
 def twoofthree_pre():
-    
+
     def twoofthree_helper_0(rtheta):
         (r, theta) = rtheta
         return (r * math.cos(theta/180*math.pi), -r * math.sin(theta/180*math.pi))
-    
+
     def twoofthree_helper_1(xy, xy0):
         return (max([abs(xy[0]), abs(xy0[0])]), max([abs(xy[1]), abs(xy0[1])]))
 
     def f_add(l1, l2):
         return [l1[i] + l2[i] for i in range(len(l1))]
-    
+
     twoofthree_persist = (0, 0)
-    
+
     for exe in twoofthree_EXE:
         if exe['mode'] == 'text':
             exe['position'] = twoofthree_helper_0(exe['position'])
@@ -509,14 +509,14 @@ def twoofthree_pre():
             exe['position'][1] = twoofthree_helper_0(exe['position'][1])
             twoofthree_persist = twoofthree_helper_1(exe['position'][0], twoofthree_persist)
             twoofthree_persist = twoofthree_helper_1(exe['position'][1], twoofthree_persist)
-    
+
     for exe in twoofthree_EXE:
         if exe['mode'] == 'text':
             exe['position'] = f_add(exe['position'], twoofthree_persist)
         elif exe['mode'] == 'line':
             exe['position'][0] = f_add(exe['position'][0], twoofthree_persist)
             exe['position'][1] = f_add(exe['position'][1], twoofthree_persist)
-    
+
     pass
 
 twoofthree_pre()
