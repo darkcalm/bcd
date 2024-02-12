@@ -11,5 +11,6 @@
     pkgs.libimagequant
     pkgs.lcms2
     pkgs.freetype
+    pkgs.texlive.combined.scheme-basic
   ];
 }

@@ -78,12 +78,25 @@ def querytoseed(query, diagram):
 
 from pyx import *
 
+def line_PyX(c, *args):
+    c.stroke(path.line(*args), [style.linewidth.Thin])
+
+# text requires pkgs.texlive.combined.scheme-basic in nix
+def text_PyX(c, text_content, *xy):
+    c.text(*xy, text_content)
+
+def querytofile_PyX(query, diagram):
+    c = canvas.canvas()
+    texts = list(query[basic_option_index].values())
+    line_PyX(c, *diagram.exe[-1]['at'][0], *diagram.exe[-1]['at'][1])
+    line_PyX(c, *diagram.exe[-2]['at'][0], *diagram.exe[-2]['at'][1])
+    text_PyX(c, texts[0], *diagram.exe[0]['at'])
+    c.writeSVGfile(diagram.name)
 
 
 
 
-
-####	PyX END ####
+####	graphics END ####
 
 
 ####	PIL START ####
@@ -279,7 +292,7 @@ class DiagramCommand:
         for group in self.options:
             info.append("\n".join(
                 [key + ": " + value for (key, value) in group.items()]))
-        return "🤖️ command info: " + self.name + " 🤖️\n\n" + "\n".join(info) + "\n\n* use a ' ' after any label to start an assignment\n* use a ';' to separate assignments\n* it is possible to reply to bot responses in order to modify or add assignments\n* it is possible to use the text in bot responses as a seed string to publish at the original channel\n* it is recommended that you try things in dms to see if the bot's working according to your needs :)"
+        return "🤖️ command info: " + self.name + " 🤖️\n\n" + "\n".join(info) + "\n\n* use a ' ' after any label to start an assignment\n* use a ';' to separate assignments\n* given read permission on servers, it is possible to reply to bot responses in order to modify or add assignments, \n* if under the same format, it is possible to use the text in bot responses as a seed string to publish at the original channel\n* it is recommended that you try things in dms to see if the bot's working according to your needs :)"
 
 # Create instances for twobytwo and twoofthree commands
 diagrams = [
@@ -415,8 +428,8 @@ for d in diagrams:
     DIAGRAM_DICT[d.name] = d
     DESCRIPTIONS[d.name] = "options: " + ", ".join(d.get_all_option_keys())
 
-DESCRIPTIONS['info'] = "syntax: option1 value1; option2 value2. enter specific diagram name for other information."
-DESCRIPTIONS['publish'] = "sets if channel sees the bot's reply (default is False)"
+DESCRIPTIONS['info'] = "syntax: option1 value1; option2 value2. enter specific diagram name for other information (sent to dm)."
+DESCRIPTIONS['pub'] = "sets the output of the bot (default: private)"
 
 MESSAGES = [
     "check dm :)",
@@ -425,9 +438,15 @@ MESSAGES = [
 
 @bot.tree.command(name='bcd')
 @app_commands.describe(**DESCRIPTIONS)
+@app_commands.choices(pub = [
+    discord.app_commands.Choice(name='private', value=0),
+    discord.app_commands.Choice(name='public/svg', value=1),
+    discord.app_commands.Choice(name='public/png', value=2),
+    discord.app_commands.Choice(name='public/both', value=3)
+])
 async def bcd(interaction: discord.Interaction,
               info: str = "",
-              publish: bool = False,
+              pub: int = 0,
               twobytwo: str = "",
               twoofthree: str = ""):
 
@@ -437,10 +456,10 @@ async def bcd(interaction: discord.Interaction,
             await interaction.response.send_message(MESSAGES[0], ephemeral=True)
     
     if twobytwo != "":
-        await commandhelper(interaction, publish, twobytwo, diagrams[0])
+        await commandhelper(interaction, pub, twobytwo, diagrams[0])
 
     if twoofthree != "":
-        await commandhelper(interaction, publish, twoofthree, diagrams[1])
+        await commandhelper(interaction, pub, twoofthree, diagrams[1])
 
 async def exceptionhandler(interaction, message=None):
     if message:
@@ -462,14 +481,13 @@ async def on_message(interaction):
     if interaction.reference and interaction.channel:
         message = await interaction.channel.fetch_message(
             interaction.reference.message_id)
-
         if hasattr(message, 'author'):
             if message.author.id == bot.user.id:
-                if message.attachments:
-                    if interaction.content in REPLY_DELETE:
-                        await message.delete()
-                    elif interaction.content in REPLY_PASS:
-                        pass
+                if interaction.content in REPLY_DELETE:
+                    await message.delete()
+                elif interaction.content in REPLY_PASS:
+                    pass
+                elif message.attachments:
                     reply_via = message.attachments[0].filename.lower().split('.')
                     if reply_via[0] in DIAGRAM_DICT.keys():
                         diagram = DIAGRAM_DICT[reply_via[0]]
@@ -479,7 +497,7 @@ async def on_message(interaction):
                             seed = querytoseed(amendquery(
                                 inputtoquery(message.content, diagram),
                                 inputtoquery(interaction.content, diagram)), diagram)
-                            await commandhelper(interaction, True, seed, diagram)
+                            await commandhelper(interaction, 3, seed, diagram)
 
 
 async def commandhelper(interaction, pub, input, diagram):
@@ -487,15 +505,19 @@ async def commandhelper(interaction, pub, input, diagram):
         query = inputtoquery(input, diagram)
         query = defaultdrive(query, diagram)
         querytofile_PIL(query, diagram)
+        querytofile_PyX(query, diagram)
         seed = querytoseed(query, diagram)
-        with open(diagram.name + ".png", 'rb') as f:
-            if hasattr(interaction, 'response'):
-                await interaction.response.send_message(
-                    seed if pub is True else seed,
-                    file=discord.File(f),
-                    ephemeral=not pub)
-            else:
-                await interaction.channel.send(seed, file=discord.File(f))
+        files = []
+        for extension in {
+            0: ['.svg', '.png'], 1: ['.svg'], 2: ['.png'], 3: ['.svg', '.png']
+        }[pub]:
+            with open(diagram.name + extension, 'rb') as f:
+                files.append(discord.File(f))
+        if hasattr(interaction, 'response'):
+            await interaction.response.send_message(
+                seed, files=files, ephemeral=False if pub>0 else True)
+        else:
+            await interaction.channel.send(seed, files=files)
 
     except Exception:
         await exceptionhandler(interaction)
