@@ -488,6 +488,19 @@ Pillow = "*"
 requests = ["requests"]
 
 [[package]]
+name = "pyx"
+version = "0.16"
+description = "Python package for the generation of PostScript, PDF, and SVG files"
+optional = false
+python-versions = ">=3"
+files = [
+    {file = "PyX-0.16.tar.gz", hash = "sha256:4d8e3e471cd3e9a9bd13d5086cdf7c0af1b0c3f3e195e74f5f63318dc40a66d8"},
+]
+
+[package.extras]
+dev = ["IPython", "nbformat", "pillow", "sphinx", "sphinx_selective_exclude", "testfixtures", "zope.pagetemplate"]
+
+[[package]]
 name = "yarl"
 version = "1.9.4"
 description = "Yet another URL library"
@@ -593,4 +606,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10.11"
-content-hash = "9ac9d1df7725e4e401adc477266005d3b4abd74423f737a8c159ff175bbc87ed"
+content-hash = "e3b961d582538ff7c53810108a498fc2eed834ccd02968d12807dd9e55851473"
