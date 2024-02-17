@@ -118,38 +118,7 @@ def querytofile_PyX(query, diagram):
 
 
 
-
-####	graphics END ####
-
-
-"""
-####	PIL START ####
-# https://pillow.readthedocs.io/en/stable/handbook/
-from PIL import Image, ImageDraw, ImageFont
-from pilmoji import Pilmoji
-
-global BACKGROUND_COLOR, FONT_COLOR, LINE_WIDTH, FITS
-
-BACKGROUND_COLOR = (255, 255, 255)
-FONT_COLOR = (0, 0, 0)
-LINE_WIDTH = 1
-
-
-def getresources_PIL(imagesize, fontsize):
-    font = ImageFont.truetype('OpenSansEmoji.ttf', fontsize)
-    PILimage = Image.new('RGB', imagesize, color=BACKGROUND_COLOR)
-    PILdraw = ImageDraw.Draw(PILimage)
-    return PILimage, PILdraw, font
-
-
-# descent: https://levelup.gitconnected.com/how-to-properly-calculate-text-size-in-pil-images-17a2cc6f51fd
-def getsize_PIL(textwrap, font, PILimage):
-    with Pilmoji(PILimage) as pilmoji:
-        size = pilmoji.getsize(textwrap, font=font)    # hotfixed core.py, helpers.py
-        return [size[0], size[1] + font.getmetrics()[1]]
-
-
-# textwrapped is a string with potentially some line-breaks ("\n")
+'''
 def getwrappedtext_PIL(text, wrapspan, font):
     def getspan(target, font):
         return font.getbbox(target)[2]
@@ -184,107 +153,10 @@ def getwrappedtext_PIL(text, wrapspan, font):
 
     textwrap.append(text[lasti:].strip(" "))
     return "\n".join(textwrap)
+'''
 
+####	graphics END ####
 
-def line_PIL(xyxy, PILdraw):
-    PILdraw.line([(xyxy[0], xyxy[1]), (xyxy[2], xyxy[3])], width=LINE_WIDTH, fill=FONT_COLOR)
-
-
-def text_PIL(xy, anchor, wrappedtext, font, PILimage):
-    with Pilmoji(PILimage) as pilmoji:
-        pilmoji.text(xy,
-                     anchor=anchor,
-                     text=wrappedtext,
-                     font=font,
-                     fill=FONT_COLOR)
-
-
-def querytofile_PIL(query, diagram):
-    # notations
-    (_tilewidth, _tileheight, _fontsize) = query[-1].values()
-    _texts = list(query[basic_option_index].values())
-
-    # interfaces
-    def text(xy_principle, posture):
-        text_PIL(f_add(xy_principle, posture[2]),
-                 posture[0], posture[1], PILfont, PILimage)
-
-    def line(xy_principle, posture1, xy2, posture2): # principle ~ larger
-        line_PIL(f_add(xy2, posture2) + f_add(xy_principle, posture1), PILdraw)
-
-    def gettextsize(indexortext):
-        if isinstance(indexortext, int): # index of agentscuting elements
-            return getsize_PIL(gettextposture(indexortext)[1], PILfont, PILimage)
-        if isinstance(indexortext, str):
-            return getsize_PIL(indexortext, PILfont, PILimage)
-
-    # macros
-    def f_coordinates(xy, mode="cartesian"):
-        if mode == "cartesian":
-            return f_mul(xy, (_tilewidth, _tileheight))
-
-    def gettextposture(i, postureparam=None):
-        if postureparam is None:
-            postureparam = diagram.agents[i]['do']
-        (spanmax, singlelineanchor, multilinevector) = postureparam
-        wrappedtext = getwrappedtext_PIL(_texts[i], spanmax*_tilewidth, PILfont)
-        multilinevector = f_mul(gettextsize(wrappedtext), multilinevector)
-        return (singlelineanchor, wrappedtext, multilinevector)
-
-    def getlineposture(postureparam):
-        return f_mul(gettextsize(postureparam[0]), postureparam[1])
-
-    # micros
-    def f_max(l1, l2):
-        return [max(a, b) for a, b in zip(l1, l2)]
-
-    def f_add(l1, l2):
-        return [l1[i] + l2[i] for i in range(len(l1))]
-
-    def f_mul(l1, l2):
-        return [l1[i] * l2[i] for i in range(len(l1))]
-
-    def f_int(l):
-        return [int(a) for a in l]
-
-    # resource
-    srcimage = Image.new('RGB', (0, 0))
-    PILimage, PILdraw, PILfont = getresources_PIL(srcimage.size, _fontsize)
-    agents_runtime = []
-    for i, agents in enumerate(diagram.agents):
-        if agents['as'] == 'text':
-            agents_runtime.append(
-                {'as': 'text',
-                 'xy_principle': f_coordinates(agents['at']),
-                 'posture': gettextposture(i, agents['do'])})
-        elif agents['as'] == 'line':
-            agents_runtime.append(
-                {'as': 'line',
-                 'xy2': f_coordinates(agents['at'][0]),
-                 'posture2': getlineposture(agents['do'][0]),
-                 'xy_principle': f_coordinates(agents['at'][1]),
-                 'posture1': getlineposture(agents['do'][1])})
-
-        # make as big what will be drawn
-        PILimage, PILdraw, PILfont = getresources_PIL(
-            f_int(f_max(agents_runtime[-1]['xy_principle'], srcimage.size)), _fontsize)
-        PILimage.paste(srcimage, (0, 0) + srcimage.size)
-        srcimage = PILimage
-
-    # agentscution
-    for i, agents in enumerate(agents_runtime):
-        if agents['as'] == 'text':
-            del agents_runtime[i]['as']
-            text(**agents_runtime[i])
-        elif agents['as'] == 'line':
-            del agents_runtime[i]['as']
-            line(**agents_runtime[i])
-
-    PILimage.save(diagram.name + '.png')
-
-
-####	PIL END ####
-"""
 
 
 ####    diagram setup START ####
@@ -339,17 +211,17 @@ diagrams = [
         }],
         [[''] * 11, [None]],
         [
-            {'as': 'text', 'at': (0, 4), 'do': [2, 'la', (0, 0)]},
-            {'as': 'text', 'at': (3, 3), 'do': [2, 'mm', (0, 0)]},
-            {'as': 'text', 'at': (1, 3), 'do': [2, 'mm', (0, 0)]},
-            {'as': 'text', 'at': (1, 1), 'do': [2, 'mm', (0, 0)]},
-            {'as': 'text', 'at': (3, 1), 'do': [2, 'mm', (0, 0)]},
-            {'as': 'text', 'at': (4, 2), 'do': [2, 'rm', (0, 0)]},
-            {'as': 'text', 'at': (0, 2), 'do': [2, 'lm', (0, 0)]},
-            {'as': 'text', 'at': (2, 4), 'do': [2, 'ma', (0, 0)]},
-            {'as': 'text', 'at': (2, 0), 'do': [2, 'md', (0, 0)]},
-            {'as': 'text', 'at': (3, 2), 'do': [1, 'ra', (0, 0)]},
-            {'as': 'text', 'at': (2, 3), 'do': [.5, 'ra', (0, 0)]},
+            {'as': 'text', 'at': (0, 4), 'do': []},
+            {'as': 'text', 'at': (3, 3), 'do': []},
+            {'as': 'text', 'at': (1, 3), 'do': []},
+            {'as': 'text', 'at': (1, 1), 'do': []},
+            {'as': 'text', 'at': (3, 1), 'do': []},
+            {'as': 'text', 'at': (4, 2), 'do': []},
+            {'as': 'text', 'at': (0, 2), 'do': []},
+            {'as': 'text', 'at': (2, 4), 'do': []},
+            {'as': 'text', 'at': (2, 0), 'do': []},
+            {'as': 'text', 'at': (3, 2), 'do': []},
+            {'as': 'text', 'at': (2, 3), 'do': []},
             {'as': 'line', 'at': [(0, 2), (4, 2)], 'do': 'stationary'},
             {'as': 'line', 'at': [(2, 4), (2, 0)], 'do': 'stationary'}
         ]
@@ -368,13 +240,13 @@ diagrams = [
         }],
         [[''] * 7, [None]],
         [
-            {'as': 'text', 'at': (2, 225), 'do': [2, 'rs', (0, 0)]},
-            {'as': 'text', 'at': (1, 270), 'do': [2, 'mt', (0, -1)]},
-            {'as': 'text', 'at': (1, 150), 'do': [1, 'rt', (0, 0)]},
-            {'as': 'text', 'at': (1, 30), 'do': [1, 'lt', (0, 0)]},
-            {'as': 'text', 'at': (0.618, 90), 'do': [1, 'mt', (0, 0)]},
-            {'as': 'text', 'at': (0.618, 330), 'do': [1, 'rs', (0, 0)]},
-            {'as': 'text', 'at': (0.618, 210), 'do': [1, 'ls', (0, 0)]},
+            {'as': 'text', 'at': (2, 225), 'do': []},
+            {'as': 'text', 'at': (1, 270), 'do': []},
+            {'as': 'text', 'at': (1, 150), 'do': []},
+            {'as': 'text', 'at': (1, 30), 'do': []},
+            {'as': 'text', 'at': (0.618, 90), 'do': []},
+            {'as': 'text', 'at': (0.618, 330), 'do': []},
+            {'as': 'text', 'at': (0.618, 210), 'do': []},
             {'as': 'line', 'at': [(1, 150), (1, 30)], 'do': 'stationary'},
             {'as': 'line', 'at': [(1, 30), (1, 270)], 'do': 'stationary'},
             {'as': 'line', 'at': [(1, 270), (1, 150)], 'do': 'stationary'}
