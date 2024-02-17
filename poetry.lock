@@ -501,6 +501,21 @@ files = [
 dev = ["IPython", "nbformat", "pillow", "sphinx", "sphinx_selective_exclude", "testfixtures", "zope.pagetemplate"]
 
 [[package]]
+name = "wand"
+version = "0.6.13"
+description = "Ctypes-based simple MagickWand API binding for Python"
+optional = false
+python-versions = "*"
+files = [
+    {file = "Wand-0.6.13-py2.py3-none-any.whl", hash = "sha256:e5dda0ac2204a40c29ef5c4cb310770c95d3d05c37b1379e69c94ea79d7d19c0"},
+    {file = "Wand-0.6.13.tar.gz", hash = "sha256:f5013484eaf7a20eb22d1821aaefe60b50cc329722372b5f8565d46d4aaafcca"},
+]
+
+[package.extras]
+doc = ["Sphinx (>=5.3.0)"]
+test = ["pytest (>=7.2.0)"]
+
+[[package]]
 name = "yarl"
 version = "1.9.4"
 description = "Yet another URL library"
@@ -606,4 +621,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10.11"
-content-hash = "e3b961d582538ff7c53810108a498fc2eed834ccd02968d12807dd9e55851473"
+content-hash = "6371d853a371b30e4df408a6e4e87b689d7d5c8c81ba806c5a8b6d170372e9e6"

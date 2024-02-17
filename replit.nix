@@ -1,5 +1,6 @@
 { pkgs }: {
   deps = [
+    pkgs.imagemagickBig
     pkgs.zlib
     pkgs.tk
     pkgs.tcl

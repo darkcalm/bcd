@@ -10,6 +10,7 @@ discord = "^2.3.2"
 pillow = "^10.2.0"
 pilmoji = "^2.0.4"
 pyx = "^0.16"
+wand = "^0.6.13"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

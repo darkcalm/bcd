@@ -76,6 +76,10 @@ def querytoseed(query, diagram):
 
 ####    graphics START ####
 
+from wand.api import library
+import wand.color
+import wand.image
+
 from pyx import *
 
 def line_PyX(c, *args):
@@ -93,12 +97,23 @@ def querytofile_PyX(query, diagram):
     text_PyX(c, texts[0], *diagram.exe[0]['at'])
     c.writeSVGfile(diagram.name)
 
+    with wand.image.Image() as image:
+        with wand.color.Color('transparent') as background_color:
+            library.MagickSetBackgroundColor(image.wand, 
+                                             background_color.resource) 
+        image.read(blob=open(diagram.name + '.svg', "r").read().encode('utf-8'), format="svg")
+        png_image = image.make_blob("png32")
+
+    with open(diagram.name + '.png', "wb") as out:
+        out.write(png_image)
+
 
 
 
 ####	graphics END ####
 
 
+"""
 ####	PIL START ####
 # https://pillow.readthedocs.io/en/stable/handbook/
 from PIL import Image, ImageDraw, ImageFont
@@ -260,7 +275,7 @@ def querytofile_PIL(query, diagram):
 
 
 ####	PIL END ####
-
+"""
 
 
 ####    diagram setup START ####
@@ -504,7 +519,6 @@ async def commandhelper(interaction, pub, input, diagram):
     try:
         query = inputtoquery(input, diagram)
         query = defaultdrive(query, diagram)
-        querytofile_PIL(query, diagram)
         querytofile_PyX(query, diagram)
         seed = querytoseed(query, diagram)
         files = []
