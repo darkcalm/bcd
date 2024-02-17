@@ -13,19 +13,19 @@ basic_option_index = 0
 
 def inputtoquery(input, diagram):
     _input = input
-    input = input.split(delimiter)
+    input = input.strip(delimiter).split(delimiter)
+    input = [q.strip(' ') for q in input]
     query = []
+    
     if len(input) == len(diagram.get_all_option_keys()):
         for group in diagram.options:
             query.append(dict(zip(group.keys(), input[:len(group)])))
             input = input[len(group):]
-        return query
-
+    
     elif len(input) == len(diagram.options[basic_option_index].keys()):
         for group in diagram.options:
             query.append(dict(zip(group.keys(), [None]*len(group))))
-        query[basic_option_index] = input
-        return query
+        query[basic_option_index] = dict(zip(diagram.options[basic_option_index].keys(), input))
     
     else:
         for group in diagram.options:
@@ -38,7 +38,7 @@ def inputtoquery(input, diagram):
                     find = find[0]
                     query[-1][key] = find[value_groups[0]] or find[value_groups[1]]
             
-        return query
+    return query
 
 def amendquery(oldquery, newquery):
     if not (oldquery and newquery):
@@ -91,19 +91,28 @@ def text_PyX(c, text_content, *xy):
 
 def querytofile_PyX(query, diagram):
     c = canvas.canvas()
-    texts = list(query[basic_option_index].values())
-    line_PyX(c, *diagram.exe[-1]['at'][0], *diagram.exe[-1]['at'][1])
-    line_PyX(c, *diagram.exe[-2]['at'][0], *diagram.exe[-2]['at'][1])
-    text_PyX(c, texts[0], *diagram.exe[0]['at'])
+
+    for i, text in enumerate(list(query[basic_option_index].values())):
+        diagram.agents[i]['mask'] = text
+    
+    for agents in diagram.agents:
+        if agents['do'] == 'stationary':
+            if agents['as'] == 'line':
+                line_PyX(c, *agents['at'][0], *agents['at'][1])
+
+    for agents in diagram.agents:
+        if agents['do'] != 'stationary':
+            if agents['as'] == 'text':
+                text_PyX(c, agents['mask'], *agents['at'])
+    
     c.writeSVGfile(diagram.name)
 
-    with wand.image.Image() as image:
+    with wand.image.Image(resolution = 300) as image:
         with wand.color.Color('transparent') as background_color:
             library.MagickSetBackgroundColor(image.wand, 
                                              background_color.resource) 
         image.read(blob=open(diagram.name + '.svg', "r").read().encode('utf-8'), format="svg")
         png_image = image.make_blob("png32")
-
     with open(diagram.name + '.png', "wb") as out:
         out.write(png_image)
 
@@ -204,7 +213,7 @@ def querytofile_PIL(query, diagram):
         line_PIL(f_add(xy2, posture2) + f_add(xy_principle, posture1), PILdraw)
 
     def gettextsize(indexortext):
-        if isinstance(indexortext, int): # index of executing elements
+        if isinstance(indexortext, int): # index of agentscuting elements
             return getsize_PIL(gettextposture(indexortext)[1], PILfont, PILimage)
         if isinstance(indexortext, str):
             return getsize_PIL(indexortext, PILfont, PILimage)
@@ -216,7 +225,7 @@ def querytofile_PIL(query, diagram):
 
     def gettextposture(i, postureparam=None):
         if postureparam is None:
-            postureparam = diagram.exe[i]['do']
+            postureparam = diagram.agents[i]['do']
         (spanmax, singlelineanchor, multilinevector) = postureparam
         wrappedtext = getwrappedtext_PIL(_texts[i], spanmax*_tilewidth, PILfont)
         multilinevector = f_mul(gettextsize(wrappedtext), multilinevector)
@@ -241,35 +250,35 @@ def querytofile_PIL(query, diagram):
     # resource
     srcimage = Image.new('RGB', (0, 0))
     PILimage, PILdraw, PILfont = getresources_PIL(srcimage.size, _fontsize)
-    EXE_runtime = []
-    for i, exe in enumerate(diagram.exe):
-        if exe['is'] == 'text':
-            EXE_runtime.append(
-                {'is': 'text',
-                 'xy_principle': f_coordinates(exe['at']),
-                 'posture': gettextposture(i, exe['do'])})
-        elif exe['is'] == 'line':
-            EXE_runtime.append(
-                {'is': 'line',
-                 'xy2': f_coordinates(exe['at'][0]),
-                 'posture2': getlineposture(exe['do'][0]),
-                 'xy_principle': f_coordinates(exe['at'][1]),
-                 'posture1': getlineposture(exe['do'][1])})
+    agents_runtime = []
+    for i, agents in enumerate(diagram.agents):
+        if agents['as'] == 'text':
+            agents_runtime.append(
+                {'as': 'text',
+                 'xy_principle': f_coordinates(agents['at']),
+                 'posture': gettextposture(i, agents['do'])})
+        elif agents['as'] == 'line':
+            agents_runtime.append(
+                {'as': 'line',
+                 'xy2': f_coordinates(agents['at'][0]),
+                 'posture2': getlineposture(agents['do'][0]),
+                 'xy_principle': f_coordinates(agents['at'][1]),
+                 'posture1': getlineposture(agents['do'][1])})
 
         # make as big what will be drawn
         PILimage, PILdraw, PILfont = getresources_PIL(
-            f_int(f_max(EXE_runtime[-1]['xy_principle'], srcimage.size)), _fontsize)
+            f_int(f_max(agents_runtime[-1]['xy_principle'], srcimage.size)), _fontsize)
         PILimage.paste(srcimage, (0, 0) + srcimage.size)
         srcimage = PILimage
 
-    # execution
-    for i, exe in enumerate(EXE_runtime):
-        if exe['is'] == 'text':
-            del EXE_runtime[i]['is']
-            text(**EXE_runtime[i])
-        elif exe['is'] == 'line':
-            del EXE_runtime[i]['is']
-            line(**EXE_runtime[i])
+    # agentscution
+    for i, agents in enumerate(agents_runtime):
+        if agents['as'] == 'text':
+            del agents_runtime[i]['as']
+            text(**agents_runtime[i])
+        elif agents['as'] == 'line':
+            del agents_runtime[i]['as']
+            line(**agents_runtime[i])
 
     PILimage.save(diagram.name + '.png')
 
@@ -283,17 +292,17 @@ def querytofile_PIL(query, diagram):
 import math
 
 class DiagramCommand:
-    def __init__(self, name, options, drive, exe):
+    def __init__(self, name, options, drive, agents):
         self.name = name
         self.options = options
         self.defaults = drive
-        self.exe = exe
+        self.agents = agents
 
     def get_defaults(self):
         return self.defaults
 
-    def get_exe(self):
-        return self.exe
+    def get_agents(self):
+        return self.agents
     
     def get_all_option_keys(self):
         options = []
@@ -326,25 +335,23 @@ diagrams = [
             "x": "x axis label",
             "y": "y axis label"
         }, {
-            "tw": "tile width",
-            "th": "tile height",
             "fs": "font size"
         }],
-        [[''] * 11, [200, 200, 24]],
+        [[''] * 11, [None]],
         [
-            {'is': 'text', 'at': (0, 0), 'do': [2, 'la', (0, 0)]},
-            {'is': 'text', 'at': (3, 1), 'do': [2, 'mm', (0, 0)]},
-            {'is': 'text', 'at': (1, 1), 'do': [2, 'mm', (0, 0)]},
-            {'is': 'text', 'at': (1, 3), 'do': [2, 'mm', (0, 0)]},
-            {'is': 'text', 'at': (3, 3), 'do': [2, 'mm', (0, 0)]},
-            {'is': 'text', 'at': (4, 2), 'do': [2, 'rm', (0, 0)]},
-            {'is': 'text', 'at': (0, 2), 'do': [2, 'lm', (0, 0)]},
-            {'is': 'text', 'at': (2, 0), 'do': [2, 'ma', (0, 0)]},
-            {'is': 'text', 'at': (2, 4), 'do': [2, 'md', (0, 0)]},
-            {'is': 'text', 'at': (3, 2), 'do': [1, 'ra', (0, 0)]},
-            {'is': 'text', 'at': (2, 1), 'do': [.5, 'ra', (0, 0)]},
-            {'is': 'line', 'at': [(0, 2), (4, 2)], 'do': [(6, [1, 0]), (5, [-1, 0])]},
-            {'is': 'line', 'at': [(2, 0), (2, 4)], 'do': [(7, [0, 1]), (8, [0, -1])]}
+            {'as': 'text', 'at': (0, 4), 'do': [2, 'la', (0, 0)]},
+            {'as': 'text', 'at': (3, 3), 'do': [2, 'mm', (0, 0)]},
+            {'as': 'text', 'at': (1, 3), 'do': [2, 'mm', (0, 0)]},
+            {'as': 'text', 'at': (1, 1), 'do': [2, 'mm', (0, 0)]},
+            {'as': 'text', 'at': (3, 1), 'do': [2, 'mm', (0, 0)]},
+            {'as': 'text', 'at': (4, 2), 'do': [2, 'rm', (0, 0)]},
+            {'as': 'text', 'at': (0, 2), 'do': [2, 'lm', (0, 0)]},
+            {'as': 'text', 'at': (2, 4), 'do': [2, 'ma', (0, 0)]},
+            {'as': 'text', 'at': (2, 0), 'do': [2, 'md', (0, 0)]},
+            {'as': 'text', 'at': (3, 2), 'do': [1, 'ra', (0, 0)]},
+            {'as': 'text', 'at': (2, 3), 'do': [.5, 'ra', (0, 0)]},
+            {'as': 'line', 'at': [(0, 2), (4, 2)], 'do': 'stationary'},
+            {'as': 'line', 'at': [(2, 4), (2, 0)], 'do': 'stationary'}
         ]
     ), DiagramCommand(
         "twoofthree",
@@ -357,22 +364,20 @@ diagrams = [
             "-l": "right-up pair",
             "-r": "up-left pair"
         }, {
-            "tw": "tile width",
-            "th": "tile height",
             "fs": "font size"
         }],
-        [[''] * 7, [200, 200, 24]],
+        [[''] * 7, [None]],
         [
-            {'is': 'text', 'at': (2.4, 315), 'do': [2, 'rs', (0, 0)]},
-            {'is': 'text', 'at': (1, 90), 'do': [2, 'mt', (0, -1)]},
-            {'is': 'text', 'at': (1, 210), 'do': [1, 'rt', (0, 0)]},
-            {'is': 'text', 'at': (1, 330), 'do': [1, 'lt', (0, 0)]},
-            {'is': 'text', 'at': (0.618, 270), 'do': [1, 'mt', (0, 0)]},
-            {'is': 'text', 'at': (0.618, 150), 'do': [1, 'rs', (0, 0)]},
-            {'is': 'text', 'at': (0.618, 30), 'do': [1, 'ls', (0, 0)]},
-            {'is': 'line', 'at': [(1, 210), (1, 330)], 'do': [(0, [0, 0]), (0, [0, 0])]},
-            {'is': 'line', 'at': [(1, 330), (1, 90)], 'do': [(0, [0, 0]), (0, [0, 0])]},
-            {'is': 'line', 'at': [(1, 90), (1, 210)], 'do': [(0, [0, 0]), (0, [0, 0])]}
+            {'as': 'text', 'at': (2, 225), 'do': [2, 'rs', (0, 0)]},
+            {'as': 'text', 'at': (1, 270), 'do': [2, 'mt', (0, -1)]},
+            {'as': 'text', 'at': (1, 150), 'do': [1, 'rt', (0, 0)]},
+            {'as': 'text', 'at': (1, 30), 'do': [1, 'lt', (0, 0)]},
+            {'as': 'text', 'at': (0.618, 90), 'do': [1, 'mt', (0, 0)]},
+            {'as': 'text', 'at': (0.618, 330), 'do': [1, 'rs', (0, 0)]},
+            {'as': 'text', 'at': (0.618, 210), 'do': [1, 'ls', (0, 0)]},
+            {'as': 'line', 'at': [(1, 150), (1, 30)], 'do': 'stationary'},
+            {'as': 'line', 'at': [(1, 30), (1, 270)], 'do': 'stationary'},
+            {'as': 'line', 'at': [(1, 270), (1, 150)], 'do': 'stationary'}
         ]
     )
 ]
@@ -393,22 +398,22 @@ def diagram_setup_processing(index):
 
         persist = (0, 0)
     
-        for exe in diagrams[index].exe:
-            if exe['is'] == 'text':
-                exe['at'] = helper_0(exe['at'])
-                persist = helper_1(exe['at'], persist)
-            elif exe['is'] == 'line':
-                exe['at'][0] = helper_0(exe['at'][0])
-                exe['at'][1] = helper_0(exe['at'][1])
-                persist = helper_1(exe['at'][0], persist)
-                persist = helper_1(exe['at'][1], persist)
+        for agents in diagrams[index].agents:
+            if agents['as'] == 'text':
+                agents['at'] = helper_0(agents['at'])
+                persist = helper_1(agents['at'], persist)
+            elif agents['as'] == 'line':
+                agents['at'][0] = helper_0(agents['at'][0])
+                agents['at'][1] = helper_0(agents['at'][1])
+                persist = helper_1(agents['at'][0], persist)
+                persist = helper_1(agents['at'][1], persist)
     
-        for exe in diagrams[index].exe:
-            if exe['is'] == 'text':
-                exe['at'] = f_add(exe['at'], persist)
-            elif exe['is'] == 'line':
-                exe['at'][0] = f_add(exe['at'][0], persist)
-                exe['at'][1] = f_add(exe['at'][1], persist)
+        for agents in diagrams[index].agents:
+            if agents['as'] == 'text':
+                agents['at'] = f_add(agents['at'], persist)
+            elif agents['as'] == 'line':
+                agents['at'][0] = f_add(agents['at'][0], persist)
+                agents['at'][1] = f_add(agents['at'][1], persist)
 
 for i in range(len(diagrams)):
     diagram_setup_processing(i)
