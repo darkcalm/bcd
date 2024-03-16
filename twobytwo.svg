@@ -1,9 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" fill="none" version="1.1" viewBox="-1 -114.386 115.386 115.386" x="-1pt" y="-114.386pt" width="115.386pt" height="115.386pt" stroke-width="0.566929" stroke-miterlimit="10.000000">
- <g stroke-width="0.283465">
-  <path d="M0 -56.6929L113.386 -56.6929" stroke="black"/>
- </g>
- <g stroke-width="0.283465">
-  <path d="M56.6929 -113.386L56.6929 -0" stroke="black"/>
- </g>
+<?xml version='1.0' encoding='ASCII' standalone='yes'?>
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" version="1.1" stroke-width="0.566929" stroke-miterlimit="10.000000" width="800" height="800">
+
 </svg>

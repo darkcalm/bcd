@@ -2,41 +2,45 @@
 
 import re
 
-delimiter = ';'
+# regex ex. ^(1) ([^;]*)|; *(1) ([^;]*)[; ]* for queries ex. "1 foo;" or "; 1 foo"
 
-# regex ex. ^(1) ([^;]*)|; *(1) ([^;]*)[; ]* for seed strings ex. 1 good; or 1 bad
-def seed_regex(key):
-    return r"^(" + re.escape(key) + ") ([^" + delimiter + "]*)|" + delimiter + " *(" + re.escape(key) + ") ([^" + delimiter + "]*)[" + delimiter + " ]*" 
+DELIMITER = ';'
+REGEX_VALUE_GROUPNUM = [1, 3]
 
-value_groups = [1, 3]
-basic_option_index = 0
+def query_regex(key):
+    return r"^(" + re.escape(key) + ") ([^" + DELIMITER + "]*)|" + DELIMITER + " *(" + re.escape(key) + ") ([^" + DELIMITER + "]*)[" + DELIMITER + " ]*" 
+
+# a valid query is either 1) a complete assignment of diagram texts and settings, 2) a complete assignment of diagram texts, or 3) a partial assignment of diagram texts indicating what parts of the diagram to use
+
+TEXT_SETTINGS_INDEX = 0
+SETTINGS_UNSET_VALUE = None
 
 def inputtoquery(input, diagram):
     _input = input
-    input = input.strip(delimiter).split(delimiter)
+    input = input.strip(DELIMITER).split(DELIMITER)
     input = [q.strip(' ') for q in input]
     query = []
     
     if len(input) == len(diagram.get_all_option_keys()):
-        for group in diagram.options:
+        for group in diagram.settings:
             query.append(dict(zip(group.keys(), input[:len(group)])))
             input = input[len(group):]
     
-    elif len(input) == len(diagram.options[basic_option_index].keys()):
-        for group in diagram.options:
-            query.append(dict(zip(group.keys(), [None]*len(group))))
-        query[basic_option_index] = dict(zip(diagram.options[basic_option_index].keys(), input))
+    elif len(input) == len(diagram.settings[TEXT_SETTINGS_INDEX].keys()):
+        for group in diagram.settings:
+            query.append(dict(zip(group.keys(), [SETTINGS_UNSET_VALUE]*len(group))))
+        query[TEXT_SETTINGS_INDEX] = dict(zip(diagram.settings[TEXT_SETTINGS_INDEX].keys(), input))
     
     else:
-        for group in diagram.options:
+        for group in diagram.settings:
             query.append({})
             for key in group.keys():
-                find = re.findall(seed_regex(key), _input)
+                find = re.findall(query_regex(key), _input)
                 if (len(find) == 0):
-                    query[-1][key] = None
+                    query[-1][key] = SETTINGS_UNSET_VALUE
                 else:
                     find = find[0]
-                    query[-1][key] = find[value_groups[0]] or find[value_groups[1]]
+                    query[-1][key] = find[REGEX_VALUE_GROUPNUM[0]] or find[REGEX_VALUE_GROUPNUM[1]]
             
     return query
 
@@ -45,7 +49,7 @@ def amendquery(oldquery, newquery):
         return oldquery or newquery
     for i, group in enumerate(newquery):
         for key, new_value in group.items():
-            if new_value is None:
+            if new_value is SETTINGS_UNSET_VALUE:
                 newquery[i][key] = oldquery[i][key]
     return newquery
 
@@ -53,20 +57,20 @@ def defaultdrive(query, diagram):
     for i, group in enumerate(diagram.defaults):
         for j, type in enumerate(group):
             values = list(query[i].values())
-            if values[j] is None:
+            if values[j] is SETTINGS_UNSET_VALUE:
                 values[j] = diagram.defaults[i][j]
             elif isinstance(type, int):
                 values[j] = int(float(values[j]))
             elif isinstance(type, str):
                 values[j] = str(values[j])
-            query[i] = dict(zip(diagram.options[i].keys(), values))
+            query[i] = dict(zip(diagram.settings[i].keys(), values))
     return query
 
 def querytoseed(query, diagram):
     seed = ""
     for group in query:
-        seed += delimiter.join([str(_) for _ in group.values()]) + delimiter
-    seed = seed[:-len(delimiter)]
+        seed += DELIMITER.join([str(_) for _ in group.values()]) + DELIMITER
+    seed = seed[:-len(DELIMITER)]
     return seed
 
 
@@ -82,43 +86,59 @@ import wand.image
 
 from pyx import *
 
+import svgutils.transform
+import sys
+
 def line_PyX(c, *args):
     c.stroke(path.line(*args), [style.linewidth.Thin])
 
-# text requires pkgs.texlive.combined.scheme-basic in nix
+# text requires pkgs.texlive.combined.scheme-basic (nix)
 def text_PyX(c, text_content, *xy):
     c.text(*xy, text_content)
 
-def querytofile_PyX(query, diagram):
+def filename_svg(name):
+    return name +'.svg'
+
+def filename_png(name):
+    return name +'.png'
+
+async def querytofile_PyX(query, diagram):
     c = canvas.canvas()
 
-    for i, text in enumerate(list(query[basic_option_index].values())):
+    for i, text in enumerate(list(query[TEXT_SETTINGS_INDEX].values())):
         diagram.agents[i]['mask'] = text
     
-    for agents in diagram.agents:
-        if agents['do'] == 'stationary':
-            if agents['as'] == 'line':
-                line_PyX(c, *agents['at'][0], *agents['at'][1])
-
-    for agents in diagram.agents:
-        if agents['do'] != 'stationary':
-            if agents['as'] == 'text':
-                text_PyX(c, agents['mask'], *agents['at'])
-    
+    for agent in diagram.agents:
+        for do in agent['do']:
+            if do == 'stationary':
+                if agent['as'] == 'line':
+                    line_PyX(c, *agent['at'][0], *agent['at'][1])
+            else:
+                if agent['as'] == 'text':
+                    text_PyX(c, agent['mask'], *agent['at'])
+                
     c.writeSVGfile(diagram.name)
-
+    
     with wand.image.Image(resolution = 300) as image:
         with wand.color.Color('transparent') as background_color:
             library.MagickSetBackgroundColor(image.wand, 
                                              background_color.resource) 
-        image.read(blob=open(diagram.name + '.svg', "r").read().encode('utf-8'), format="svg")
+        image.read(blob=open(filename_svg(diagram.name), "r").read().encode('utf-8'), format="svg")
         png_image = image.make_blob("png32")
-    with open(diagram.name + '.png', "wb") as out:
+    with open(filename_png(diagram.name), "wb") as out:
         out.write(png_image)
 
+async def filetoscaled_svgutils(file, scalevalue):
+    if file and file[0].filename.lower().endswith('.svg'):
+        # scale svg with scalevalue
+        pass
+
+    
+    pass
 
 
 '''
+# wrapping of text within a width
 def getwrappedtext_PIL(text, wrapspan, font):
     def getspan(target, font):
         return font.getbbox(target)[2]
@@ -164,9 +184,9 @@ def getwrappedtext_PIL(text, wrapspan, font):
 import math
 
 class DiagramCommand:
-    def __init__(self, name, options, drive, agents):
+    def __init__(self, name, settings, drive, agents):
         self.name = name
-        self.options = options
+        self.settings = settings
         self.defaults = drive
         self.agents = agents
 
@@ -177,15 +197,15 @@ class DiagramCommand:
         return self.agents
     
     def get_all_option_keys(self):
-        options = []
-        for group in self.options:
+        settings = []
+        for group in self.settings:
             for key in group:
-                options.append(key)
-        return options
+                settings.append(key)
+        return settings
 
     def get_info(self):
         info = []
-        for group in self.options:
+        for group in self.settings:
             info.append("\n".join(
                 [key + ": " + value for (key, value) in group.items()]))
         return "🤖️ command info: " + self.name + " 🤖️\n\n" + "\n".join(info) + "\n\n* use a ' ' after any label to start an assignment\n* use a ';' to separate assignments\n* given read permission on servers, it is possible to reply to bot responses in order to modify or add assignments, \n* if under the same format, it is possible to use the text in bot responses as a seed string to publish at the original channel\n* it is recommended that you try things in dms to see if the bot's working according to your needs :)"
@@ -209,21 +229,21 @@ diagrams = [
         }, {
             "fs": "font size"
         }],
-        [[''] * 11, [None]],
+        [[''] * 11, ['scale=1']],
         [
-            {'as': 'text', 'at': (0, 4), 'do': []},
-            {'as': 'text', 'at': (3, 3), 'do': []},
-            {'as': 'text', 'at': (1, 3), 'do': []},
-            {'as': 'text', 'at': (1, 1), 'do': []},
-            {'as': 'text', 'at': (3, 1), 'do': []},
-            {'as': 'text', 'at': (4, 2), 'do': []},
-            {'as': 'text', 'at': (0, 2), 'do': []},
-            {'as': 'text', 'at': (2, 4), 'do': []},
-            {'as': 'text', 'at': (2, 0), 'do': []},
-            {'as': 'text', 'at': (3, 2), 'do': []},
-            {'as': 'text', 'at': (2, 3), 'do': []},
-            {'as': 'line', 'at': [(0, 2), (4, 2)], 'do': 'stationary'},
-            {'as': 'line', 'at': [(2, 4), (2, 0)], 'do': 'stationary'}
+            {'as': 'text', 'at': (0, 4), 'do': ['']},
+            {'as': 'text', 'at': (3, 3), 'do': ['']},
+            {'as': 'text', 'at': (1, 3), 'do': ['']},
+            {'as': 'text', 'at': (1, 1), 'do': ['']},
+            {'as': 'text', 'at': (3, 1), 'do': ['']},
+            {'as': 'text', 'at': (4, 2), 'do': ['']},
+            {'as': 'text', 'at': (0, 2), 'do': ['']},
+            {'as': 'text', 'at': (2, 4), 'do': ['']},
+            {'as': 'text', 'at': (2, 0), 'do': ['']},
+            {'as': 'text', 'at': (3, 2), 'do': ['']},
+            {'as': 'text', 'at': (2, 3), 'do': ['']},
+            {'as': 'line', 'at': [(0, 2), (4, 2)], 'do': ['stationary']},
+            {'as': 'line', 'at': [(2, 4), (2, 0)], 'do': ['stationary']}
         ]
     ), DiagramCommand(
         "twoofthree",
@@ -238,18 +258,18 @@ diagrams = [
         }, {
             "fs": "font size"
         }],
-        [[''] * 7, [None]],
+        [[''] * 7, ['scale=1']],
         [
-            {'as': 'text', 'at': (2, 225), 'do': []},
-            {'as': 'text', 'at': (1, 270), 'do': []},
-            {'as': 'text', 'at': (1, 150), 'do': []},
-            {'as': 'text', 'at': (1, 30), 'do': []},
-            {'as': 'text', 'at': (0.618, 90), 'do': []},
-            {'as': 'text', 'at': (0.618, 330), 'do': []},
-            {'as': 'text', 'at': (0.618, 210), 'do': []},
-            {'as': 'line', 'at': [(1, 150), (1, 30)], 'do': 'stationary'},
-            {'as': 'line', 'at': [(1, 30), (1, 270)], 'do': 'stationary'},
-            {'as': 'line', 'at': [(1, 270), (1, 150)], 'do': 'stationary'}
+            {'as': 'text', 'at': (2, 225), 'do': ['']},
+            {'as': 'text', 'at': (1, 270), 'do': ['']},
+            {'as': 'text', 'at': (1, 150), 'do': ['']},
+            {'as': 'text', 'at': (1, 30), 'do': ['']},
+            {'as': 'text', 'at': (0.618, 90), 'do': ['']},
+            {'as': 'text', 'at': (0.618, 330), 'do': ['']},
+            {'as': 'text', 'at': (0.618, 210), 'do': ['']},
+            {'as': 'line', 'at': [(1, 150), (1, 30)], 'do': ['stationary']},
+            {'as': 'line', 'at': [(1, 30), (1, 270)], 'do': ['stationary']},
+            {'as': 'line', 'at': [(1, 270), (1, 150)], 'do': ['stationary']}
         ]
     )
 ]
@@ -306,6 +326,51 @@ TOKEN = os.environ['DISCORD_TOKEN']
 
 bot = commands.Bot(command_prefix='/', intents=discord.Intents.default())
 
+DIAGRAM_DICT = {}
+DESCRIPTIONS = {}
+for d in diagrams:
+    DIAGRAM_DICT[d.name] = d
+    DESCRIPTIONS[d.name] = "settings: " + ", ".join(d.get_all_option_keys())
+
+DESCRIPTIONS['info'] = "syntax: option1 value1; option2 value2. enter specific diagram name for other information (sent to dm)."
+DESCRIPTIONS['pub'] = "sets the output of the bot (default: private)"
+
+MESSAGES = {
+    'dm': "check dm :)",
+    'dev': "🤖️ bug or typo? check command info or contact dev with:\n\n"
+}
+
+PUBLISH_DICT = {
+    0: ['.svg', '.png'], 1: ['.svg'], 2: ['.png'], 3: ['.svg', '.png']
+}
+
+async def exceptionhandler(interaction, message=None):
+    if message:
+        await interaction.author.send(message)
+    elif hasattr(interaction, 'author'):
+        await interaction.author.send(MESSAGES['dev'] + str(traceback.format_exc()))
+    else:
+        await interaction.user.send(MESSAGES['dev'] + str(traceback.format_exc()))
+
+async def commandhelper(interaction, pub, input, diagram):
+    try:
+        query = inputtoquery(input, diagram)
+        query = defaultdrive(query, diagram)
+        await querytofile_PyX(query, diagram)
+        seed = querytoseed(query, diagram)
+        files = []
+        for extension in PUBLISH_DICT[pub]:
+            with open(diagram.name + extension, 'rb') as f:
+                files.append(discord.File(f))
+        if hasattr(interaction, 'response'):
+            await interaction.response.send_message(
+                seed, files=files, ephemeral=False if pub>0 else True)
+        else:
+            await interaction.channel.send(seed, files=files)
+
+    except Exception:
+        await exceptionhandler(interaction)
+            
 @bot.event
 async def on_ready():
     try:
@@ -313,20 +378,6 @@ async def on_ready():
         print(f"synced {len(synced)} command(s)")
     except Exception as e:
         print(e)
-
-DIAGRAM_DICT = {}
-DESCRIPTIONS = {}
-for d in diagrams:
-    DIAGRAM_DICT[d.name] = d
-    DESCRIPTIONS[d.name] = "options: " + ", ".join(d.get_all_option_keys())
-
-DESCRIPTIONS['info'] = "syntax: option1 value1; option2 value2. enter specific diagram name for other information (sent to dm)."
-DESCRIPTIONS['pub'] = "sets the output of the bot (default: private)"
-
-MESSAGES = [
-    "check dm :)",
-    "🤖️ bug or typo? check command info or contact dev with:\n\n"
-] 
 
 @bot.tree.command(name='bcd')
 @app_commands.describe(**DESCRIPTIONS)
@@ -345,7 +396,7 @@ async def bcd(interaction: discord.Interaction,
     for d in diagrams:
         if info == d.name:
             await interaction.user.send(d.get_info())
-            await interaction.response.send_message(MESSAGES[0], ephemeral=True)
+            await interaction.response.send_message(MESSAGES['dm'], ephemeral=True)
     
     if twobytwo != "":
         await commandhelper(interaction, pub, twobytwo, diagrams[0])
@@ -353,16 +404,8 @@ async def bcd(interaction: discord.Interaction,
     if twoofthree != "":
         await commandhelper(interaction, pub, twoofthree, diagrams[1])
 
-async def exceptionhandler(interaction, message=None):
-    if message:
-        await interaction.author.send(message)
-    elif hasattr(interaction, 'author'):
-        await interaction.author.send(MESSAGES[1] + str(traceback.format_exc()))
-    else:
-        await interaction.user.send(MESSAGES[1] + str(traceback.format_exc()))
-
-
 REPLY_DELETE = ['delete', 'd']
+REPLY_SCALE = ['scale', 's']
 REPLY_PASS = ['pass', '#']
 REPLY_INFO = ['info', 'i']
 @bot.event
@@ -379,6 +422,10 @@ async def on_message(interaction):
                     await message.delete()
                 elif interaction.content in REPLY_PASS:
                     pass
+                elif interaction.content in REPLY_SCALE:
+                    # get scalevalue
+                    scalevalue = 1
+                    await filetoscaled_svgutils(message.attachments, scalevalue)
                 elif message.attachments:
                     reply_via = message.attachments[0].filename.lower().split('.')
                     if reply_via[0] in DIAGRAM_DICT.keys():
@@ -391,30 +438,9 @@ async def on_message(interaction):
                                 inputtoquery(interaction.content, diagram)), diagram)
                             await commandhelper(interaction, 3, seed, diagram)
 
-
-async def commandhelper(interaction, pub, input, diagram):
-    try:
-        query = inputtoquery(input, diagram)
-        query = defaultdrive(query, diagram)
-        querytofile_PyX(query, diagram)
-        seed = querytoseed(query, diagram)
-        files = []
-        for extension in {
-            0: ['.svg', '.png'], 1: ['.svg'], 2: ['.png'], 3: ['.svg', '.png']
-        }[pub]:
-            with open(diagram.name + extension, 'rb') as f:
-                files.append(discord.File(f))
-        if hasattr(interaction, 'response'):
-            await interaction.response.send_message(
-                seed, files=files, ephemeral=False if pub>0 else True)
-        else:
-            await interaction.channel.send(seed, files=files)
-
-    except Exception:
-        await exceptionhandler(interaction)
-
+    
+bot.run(TOKEN)
 
 ####    discord END ####
 
 
-bot.run(TOKEN)
