@@ -1,30 +1,66 @@
 import re
 
 from functools import reduce
-from operator import iconcat
 
 
 from wand.api import library
 import wand.color
 import wand.image
 
-from pyx import *
+from pyx import *        
 
 
-class DiagramAction:
-    def __init__(self, at=None, plan=None, draw=None):
-        self.requestdata = {}
-        self.executedata = {}
-        self.memorydata = {}
+class TextAgent:
+    def __init__(self, interaction):
+        self.context = interaction
+        self.text = interaction # some part of it
+        self.connections = []
+        self.resolutions = []
+
+    def resolve(self, connection):
+        pass
+
+    def reduce(self, seed):
+        return seed
         
+
+class DiagramAgent:
+    def __init__(self, head, body):
+        pass
+
+    def inspect(self, text):
+        pass
+    
+    def connect(self, inspection):
+        pass
+
+
 
 class Epoch:
     def __init__(self, delimiter):
         self.delimiter = delimiter
 
-    async def texts_to_seeds(self, texts, diagram):
-    
-        def texts_to_query(tf):
+    async def text_to_seed(self, head, interaction):
+
+        a_ = [DiagramAgent(k, v) for k, v in head['diagram'].accepts.items()]
+        t_ = [TextAgent(t) for t in [head['history'], interaction] if t is not None]
+
+        for a in a_:
+            for t in t_:
+                a.connect(a.inspect(t))
+            
+        for t in t_:
+            t.resolve(t.connections[0])
+
+        seed = ""
+        for t in t_:
+            t.reduce(seed)
+        
+        return seed
+
+        
+        '''
+        def texts_to_query(text, agent):
             tf = [q.strip(' ') for q in re.split(r"(?<!\\)"+self.delimiter, tf)]
     
             if len(tf) == len(diagram.get_agents()):
@@ -46,9 +82,9 @@ class Epoch:
                 [texts_to_query(tf) for tf in texts]
             )
         )
+        '''
     
-    
-    async def seeds_to_files(self, seeds, filename):
+    async def seed_to_files(self, head, seed):
     
         c = canvas.canvas()
     
@@ -59,7 +95,7 @@ class Epoch:
         def drawtext_PyX(c, text_content, *xy):
             c.text(*xy, text_content)
     
-        for r in requests:
+        for r in seeds:
             if r.type == 'line':
                 drawline_PyX(c, *r.at[0], *r.at[1])
             elif r.type == 'text':
@@ -82,8 +118,3 @@ class Epoch:
                 files.append(f)
     
         return files
-
-
-
-
-

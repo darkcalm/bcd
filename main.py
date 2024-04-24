@@ -1,7 +1,5 @@
-import agents
-
-from bots import DiscordBotView
-from history import places
+from views import DiscordBotView
+from world import places
 
 import discord
 from discord.ext import commands
@@ -34,7 +32,8 @@ async def bcd(interaction: discord.Interaction,
     if diagram != "":
         await interaction.response.defer()
         await asyncio.sleep(5)
-        await bcdoutput(interaction, publish, assignments, places[diagram])
+        await bcdoutput(interaction, {'diagram': places[diagram],
+                                      'history': None}, publish)
 
     elif about != "":
         await interaction.user.send(view.get_diagram_info(places[diagram]))
@@ -46,25 +45,30 @@ async def bcd(interaction: discord.Interaction,
 async def on_message(interaction):
     if interaction.author.id == bot.user.id:
         return
+    if interaction.reference is None:
+        return
+    if interaction.reference.message_id is None:
+        return
     
     message = await interaction.channel.fetch_message(interaction.reference.message_id)
-    if message.author.id == bot.user.id:
-        if interaction.content in ['comment', '#']:
-            pass
-        elif interaction.content in ['delete', 'd']:
-            await message.delete()
-        elif message.attachments:
-            await bcdoutput(interaction, True,
-                            [message.content, interaction.content],
-                            view.get_diagram_by_attachments(message.attachments))
+    if message.author.id != bot.user.id:
+        return
+        
+    if interaction.content in ['comment', '#']:
+        pass
+    elif interaction.content in ['delete', 'd']:
+        await message.delete()
+    elif message.attachments:
+        await bcdoutput(interaction, {'diagram': view.get_diagram_by_attachments(message.attachments),
+                        'history': message}, True)
 
 
-async def bcdoutput(interaction, publish, texts, diagram):
+async def bcdoutput(interaction, head, publish):
     epoch = Epoch(delimiter=';')
-    seeds = await epoch.texts_to_seeds(texts, diagram)
-    files = await epoch.seeds_to_files(seeds, diagram.name)
+    seed = await epoch.text_to_seed(head, interaction)
+    files = await epoch.seed_to_files(head, seed)
     await interaction.followup.send(
-        seeds, files=[discord.File(f) for f in files], ephemeral=not publish)
+        seed, files=[discord.File(f) for f in files], ephemeral=not publish)
 
 @bot.event
 async def on_ready():
