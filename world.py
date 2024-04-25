@@ -5,8 +5,8 @@ class Diagram:
         self.accepts = accepts
         self.requests = requests
 
-places = {}
-places['955e7e81b6120cad67ce9890b9d18276'] = Diagram(
+protocols = {}
+protocols['955e7e81b6120cad67ce9890b9d18276'] = Diagram(
     name='twobytwo', meta={'scale': 1}, accepts={
     'q1': ['quadrant 1', 'at cartesian(4,4) (1,1)'],
     'q2': ['quadrant 2', 'at cartesian(4,4) (-1,1)'],
@@ -21,7 +21,7 @@ places['955e7e81b6120cad67ce9890b9d18276'] = Diagram(
     't': ['title', 'at cartesian(4,4) (-2,2)']
 }, requests=['line of x communicates xp/xn', 'line of y communicates yp/yn'])
 
-places['2d203aaff5b2a70c5a24fab8c26a0095'] = Diagram(
+protocols['2d203aaff5b2a70c5a24fab8c26a0095'] = Diagram(
     name='twoofthree', meta={'scale': 1, 'special': '/'}, accepts={
     'u': ['top corner', 'at polar(6,2) (0,1)'],
     'l': ['left corner', 'at polar(6,2) (2,1)'],

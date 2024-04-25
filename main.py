@@ -1,5 +1,5 @@
 from views import DiscordBotView
-from world import places
+from world import protocols
 
 import discord
 from discord.ext import commands
@@ -10,7 +10,7 @@ import os
 
 view = DiscordBotView(delimiter=';')
 
-for hash, diagram in places.items():
+for hash, diagram in protocols.items():
     view.write_discord_choice(hash, diagram)
 
 bot = commands.Bot(command_prefix='/', intents=discord.Intents.default())
@@ -32,11 +32,11 @@ async def bcd(interaction: discord.Interaction,
     if diagram != "":
         await interaction.response.defer()
         await asyncio.sleep(5)
-        await bcdoutput(interaction, {'diagram': places[diagram],
+        await bcdoutput(interaction, {'diagram': protocols[diagram],
                                       'history': None}, publish)
 
     elif about != "":
-        await interaction.user.send(view.get_diagram_info(places[diagram]))
+        await interaction.user.send(view.get_diagram_info(protocols[diagram]))
     
     else:
         await interaction.user.send("🤔 unresponsive to input")

@@ -1,7 +1,7 @@
 import re
 
 from functools import reduce
-
+from operator import iconcat
 
 from wand.api import library
 import wand.color
