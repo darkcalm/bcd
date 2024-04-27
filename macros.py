@@ -1,7 +1,6 @@
 from discord import app_commands, File
 
-from random import shuffle
-from itertools import product
+from re import escape, sub
 
 from wand.api import library
 import wand.color
@@ -26,17 +25,10 @@ class DiagramBotHelper:
                 return c.value
 
     def deflatten_seed(self, seed):
-        #
-        return seed
+        return [sub(r'\\(.)', r'\1', s) for s in seed.split(';')]
 
     def flatten_seed(self, seed):
-        #
-        return seed
-
-    def reduce_seeds(self, textagents):
-        seed = ""
-        #
-        return seed
+        return ';'.join(escape(x) for x in seed)
     
     async def text_to_seed(self, interaction, body):
         h_ = body['history'].append([interaction])
