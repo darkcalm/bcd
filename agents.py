@@ -35,7 +35,10 @@ class DrawAgents:
 
     class DrawAgent:
         def __init__(self):
-            pass    
+            pass
+
+    def facilitates(self, conflictagents):
+        pass
     
     def inference(self):
         # assign agent values to m and arg

@@ -59,7 +59,7 @@ class DiagramBotHelper:
             pass
 
         while any(da.conflicts.values()):
-            # agent does goals
+            da.facilitates(next(x for x in da.conflicts.values() if x))
             break
             
         da.inference()
