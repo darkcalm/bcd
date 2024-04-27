@@ -1,24 +1,39 @@
 from pyx import canvas, path
 
-class DiagramAgent:
+class OptionAgent:
     def __init__(self, head, body):
         pass
 
 class TextAgent:
-    def __init__(self, interaction):
+    
+    def __init__(self, interaction, diagram):
+        self.seed = ""
+        self.diagram = diagram
+
+        self.agents = [OptionAgent(k, v) for k, v in self.diagram.options.items()]
+        self.conflicts = {'overlaps': []} # should populate by diagram
+        self.evaluations = {}
+
+    def inspects(self):
+        pass
+            
+    def facilitates(self):
         pass
 
-    def facilitates(self, agents):
+    def infers(self, previous):
+        pass
+
+class DrawAgent:
+    def __init__(self, key, text):
         pass
 
 class DrawAgents:
-    
     def __init__(self, diagram, seed):
         self.canvas = canvas.canvas()
         self.diagram = diagram
     
-        self.agents = []
-        self.conflicts = {'overflows': [], 'overlaps': [], 'nones': []}
+        self.agents = [DrawAgent(key, text) for key, text in zip(self.diagram.options.keys(), seed) if text] # should include lines
+        self.conflicts = {'overflows': [self.agents], 'overlaps': [self.agents], 'nones': [self.agents]}
         self.evaluations = {}
     
     def __line__(self, *args):
@@ -33,14 +48,16 @@ class DrawAgents:
     def __inspectline__(self, *args):
         pass
 
-    class DrawAgent:
-        def __init__(self):
-            pass
 
+    def inspects(self):
+        for a in self.agents:
+            # run agents to inspect things
+            pass
+    
     def facilitates(self, conflictagents):
         pass
     
-    def inference(self):
+    def infers(self):
         # assign agent values to m and arg
         for m, args in self.evaluations.items():
             eval(m)(*args)

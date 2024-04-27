@@ -7,7 +7,7 @@ from wand.api import library
 import wand.color
 import wand.image
 
-from agents import DiagramAgent, TextAgent, DrawAgents
+from agents import TextAgent, DrawAgents
 
 class DiagramBotHelper:
     def __init__(self):
@@ -25,44 +25,41 @@ class DiagramBotHelper:
             if prompt == c.name:
                 return c.value
 
-    def validate_seed(self, diagram, seed):    # todo
-        return True
+    def deflatten_seed(self, seed):
+        #
+        return seed
 
-    def update_seed(self, diagram, seed):      # todo  
+    def flatten_seed(self, seed):
+        #
+        return seed
+
+    def reduce_seeds(self, textagents):
+        seed = ""
+        #
         return seed
     
     async def text_to_seed(self, interaction, body):
+        h_ = body['history'].append([interaction])
+        ta_ = [TextAgent(self.deflatten_seed(h.content), body['diagram']) for h in h_]
 
-        d = body['diagram']
-        da_ = [DiagramAgent(k, v) for k, v in d.options.items()]
-    
-        t = body['history'].append([interaction])
-        ta_ = [TextAgent(t) for t in t.content]
-    
-        seed = ""
-        pa_ = list(product(da_, da_))
-        while seed is not self.validate_seed(d, seed):
-            shuffle(pa_)
-            for ta in reversed(ta_):
-                for pa in pa_:
-                    ta.facilitates(pa)
-            seed = self.update_seed(d, seed)
-
-        return seed
+        for i, ta in enumerate(ta_):
+            while any(ta.conflicts.values()):
+                ta.inspects()
+                ta.facilitates()
+            if i:
+                ta.infers(ta_[i-1])
+        
+        return ta_[-1].seed
 
     async def seed_to_files(self, interaction, diagram, seed):
         
         da = DrawAgents(diagram, seed)
 
-        for a in da.agents:
-            # run agents to inspect things
-            pass
-
         while any(da.conflicts.values()):
+            da.inspects()
             da.facilitates(next(x for x in da.conflicts.values() if x))
-            break
             
-        da.inference()
+        da.infers()
         
         fns = [da.diagram.name + '.svg', da.diagram.name + '.png']
         with wand.image.Image(resolution = 300) as image:
@@ -79,5 +76,5 @@ class DiagramBotHelper:
             with open(fn, 'rb') as f:
                 files.append(File(f))
         
-        await interaction.followup.send(
-            seed, files, ephemeral=not interaction.data.get('publish'))
+        await interaction.followup.send(self.flatten_seed(seed),
+            files, ephemeral=not interaction.data.get('publish'))
