@@ -1,5 +1,5 @@
-from presets import protocols
-from macros import DiagramBotAgent
+from presets import Protocols
+from macros import DiagramBotHelper
 
 import discord
 from discord.ext import commands
@@ -7,35 +7,35 @@ from discord.ext import commands
 import os
 import asyncio
 
-dba = DiagramBotAgent()
+dba = DiagramBotHelper()
 
-for hash, diagram in protocols.items():
+for hash, diagram in Protocols.items():
     dba.write_discord_choice(hash, diagram)
 
 bot = commands.Bot(command_prefix='/', intents=discord.Intents.default())
 
 @bot.tree.command(name='bcd', description = "generate diagrams. update bcd diagrams through replies. use /bcd to see the list of diagrams.")
-@discord.app_commands.describe(diagram="choose diagram to assign to", accepts="show what a diagram accepts (to dm)", assignment="recommend: t my_title; q1 my_q1; etc.", publish="send message publicly")
+@discord.app_commands.describe(diagram="choose diagram to assign to", options="what the assignment options are for a diagram (dm)", assignment="recommend: t my_title; q1 my_q1; etc.", publish="send message publicly")
 
 @discord.app_commands.choices(
     diagram = dba.choices,
-    accepts = dba.choices,
+    options = dba.choices,
     publish = [discord.app_commands.Choice(name='private', value=0), discord.app_commands.Choice(name='public', value=1)])
 
 async def bcd(interaction: discord.Interaction,
               diagram: str = "",
-              accepts: str = "",
+              options: str = "",
               assignment: str = "",
               publish: int = 0):
 
     if diagram != "":
         await interaction.response.defer()
         await asyncio.sleep(5)
-        await bcdoutput(interaction, {'diagram': protocols[diagram],
+        await bcdoutput(interaction, {'diagram': Protocols[diagram],
                                       'history': []}, publish)
 
-    elif accepts != "":
-        await interaction.user.send(dba.get_diagram_info(protocols[diagram]))
+    elif options != "":
+        await interaction.user.send(dba.get_diagram_info(Protocols[diagram]))
     
     else:
         await interaction.user.send("🤔 unresponsive to input")
@@ -66,7 +66,7 @@ async def on_message(interaction):
 
 async def bcdoutput(interaction, body, publish):
     seed = await dba.text_to_seed(interaction, body)
-    await dba.seed_to_files(interaction, seed)
+    await dba.seed_to_files(interaction, body['diagram'], seed)
 
 @bot.event
 async def on_ready():

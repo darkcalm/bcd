@@ -1,4 +1,4 @@
-from pyx import canvas, path, style
+from pyx import canvas, path
 
 class DiagramAgent:
     def __init__(self, head, body):
@@ -11,43 +11,38 @@ class TextAgent:
     def facilitates(self, agents):
         pass
 
-class DrawAgent:
-    def __init__(self, seed):
-        
-        def fetch_diagram(seed):
-            return seed
-
-        def fetch_filename(seed):
-            return seed
-            
+class DrawAgents:
+    
+    def __init__(self, diagram, seed):
         self.canvas = canvas.canvas()
-        
-        self.d = fetch_diagram(seed)
-        self.f = fetch_filename(seed)
+        self.diagram = diagram
+    
+        self.agents = []
+        self.conflicts = {'overflows': [], 'overlaps': [], 'nones': []}
+        self.evaluations = {}
+    
+    def __line__(self, *args):
+        self.canvas.stroke(path.line(*args))
 
-        self.conflicts = []
-        self.evaluations = []
-        
-    def drawline_PyX(self, *args):
-        self.canvas.stroke(path.line(*args), [style.linewidth.Thin])
+    def __text__(self, *args): 
+        self.canvas.text(*args) # pkgs.texlive.combined.scheme-basic (nix)
+
+    def __inspecttext__(self, *args):
+        pass
     
-    def drawtext_PyX(self, text_content, *xy): 
-        self.canvas.text(*xy, text_content) # pkgs.texlive.combined.scheme-basic (nix)
-    
-    async def inspect(self):
+    def __inspectline__(self, *args):
         pass
 
-    def evaluate(self):
-        pass
+    class DrawAgent:
+        def __init__(self):
+            pass    
     
     def inference(self):
-        for e in self.evaluations:
-            if e.type == 'line':
-                self.drawline_PyX(self.canvas, *e.at[0], *e.at[1])
-            elif e.type == 'text':
-                self.drawtext_PyX(self.canvas, e.value, *e.at) 
-        self.canvas.writeSVGfile(self.f)
-    
+        # assign agent values to m and arg
+        for m, args in self.evaluations.items():
+            eval(m)(*args)
+        return self.canvas.writeSVGfile(self.diagram.name)
+
 '''
 
 import re

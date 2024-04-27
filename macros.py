@@ -1,6 +1,5 @@
 from discord import app_commands, File
 
-
 from random import shuffle
 from itertools import product
 
@@ -8,9 +7,9 @@ from wand.api import library
 import wand.color
 import wand.image
 
-import agents
+from agents import DiagramAgent, TextAgent, DrawAgents
 
-class DiagramBotAgent:
+class DiagramBotHelper:
     def __init__(self):
         self.choices = []
 
@@ -18,7 +17,7 @@ class DiagramBotAgent:
         self.choices.append(app_commands.Choice(name=diagram.name, value=hash))
     
     def get_diagram_info(self, diagram):
-        return diagram.name + ":\n" + "\n".join([k+": "+v[0] for k, v in diagram.accepts.items()])
+        return diagram.name + ":\n" + "\n".join([k+": "+v for k, v in diagram.options.items()])
 
     def get_diagram(self, message):
         prompt = message.attachments[0].filename.lower().split('.', 1)[0]
@@ -35,10 +34,10 @@ class DiagramBotAgent:
     async def text_to_seed(self, interaction, body):
 
         d = body['diagram']
-        da_ = [agents.DiagramAgent(k, v) for k, v in d.accepts.items()]
+        da_ = [DiagramAgent(k, v) for k, v in d.options.items()]
     
         t = body['history'].append([interaction])
-        ta_ = [agents.TextAgent(t) for t in t.content]
+        ta_ = [TextAgent(t) for t in t.content]
     
         seed = ""
         pa_ = list(product(da_, da_))
@@ -48,17 +47,24 @@ class DiagramBotAgent:
                 for pa in pa_:
                     ta.facilitates(pa)
             seed = self.update_seed(d, seed)
-            
+
         return seed
 
-    async def seed_to_files(self, interaction, seed):
+    async def seed_to_files(self, interaction, diagram, seed):
         
-        da = agents.DrawAgent(seed)
-        await da.inspect()
-        da.evaluate()
-        da.inference()
+        da = DrawAgents(diagram, seed)
 
-        fns = [da.f + '.svg', da.f + '.png']
+        for a in da.agents:
+            # run agents to inspect things
+            pass
+
+        while any(da.conflicts.values()):
+            # agent does goals
+            break
+            
+        da.inference()
+        
+        fns = [da.diagram.name + '.svg', da.diagram.name + '.png']
         with wand.image.Image(resolution = 300) as image:
             with wand.color.Color('white') as background_color:
                 library.MagickSetBackgroundColor(image.wand, 

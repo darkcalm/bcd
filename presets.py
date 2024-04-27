@@ -1,13 +1,41 @@
+# bcd diagram bot presets are protocols that call modules with properties
+# targets (seeds of text) are used to generate required properties
+# requests are used to generate optional properties
+# hashes: https://www.md5hashgenerator.com/
 class Diagram:
-    def __init__(self, name="", meta={}, accepts={}, requests=[]):
+    def __init__(self, name="", uses={}, options={}, othertargets=[], resolutions=[]):
         self.name = name
-        self.meta = meta
-        self.accepts = accepts
-        self.requests = requests
+        self.uses = uses
+        self.options = options
+        self.othertargets = othertargets
+        self.conflictresolutions = resolutions
 
-protocols = {}
-protocols['955e7e81b6120cad67ce9890b9d18276'] = Diagram(
-    name='twobytwo', meta={'scale': 1}, accepts={
+Protocols = {}
+Protocols['6a59fb8cc78202203894ba8de45c70ed'] = Diagram(
+    name='twobytwo',
+    uses={0: 'hashofmodule', 'optionstarget': 'functionandproperty'},
+    options={'q1': ['quadrant 1'], 'q2': ['quadrant 2'], 'q3': ['quadrant 3'], 'q4': ['quadrant 4'], 'xp': ['positive x'], 'xn': ['negative x'], 'yp': ['positive y'], 'yn': ['negative y'], 'x': ['axis x'], 'y': ['axis y'], 't': ['title']},
+    othertargets={
+        'functionandpropertiesandvalues1': ['line of x at xp/xn'],
+        'functionandpropertiesandvalues2': ['line of y at yp/yn']
+    })
+
+Protocols['c11f9788a863907937ae9889ca57eed3'] = Diagram(
+    name='twoofthree',
+    uses={0: 'hashofmodule', 'optionstarget': 'functionandproperty'},
+    options={'u': ['top corner'], 'l': ['left corner'], 'r': ['right corner'], '-u': ['bottom side'], '-l': ['right side'], '-r': ['left side'], 't': ['title']},
+    othertargets={
+        'functionandproperties1': ['line of -u at l/r'],
+        'functionandproperties2': ['line of -l at u/r'],
+        'functionandproperties3': ['line of -r at u/l']
+    })
+
+
+
+
+
+'''
+accepts={
     'q1': ['quadrant 1', 'at cartesian(4,4) (1,1)'],
     'q2': ['quadrant 2', 'at cartesian(4,4) (-1,1)'],
     'q3': ['quadrant 3', 'at cartesian(4,4) (-1,-1)'],
@@ -19,10 +47,9 @@ protocols['955e7e81b6120cad67ce9890b9d18276'] = Diagram(
     'x': ['axis x', 'at cartesian(4,4) (1,0)'],
     'y': ['axis y', 'at cartesian(4,4) (0,1)'],
     't': ['title', 'at cartesian(4,4) (-2,2)']
-}, requests=['line of x communicates xp/xn', 'line of y communicates yp/yn'])
+}
 
-protocols['2d203aaff5b2a70c5a24fab8c26a0095'] = Diagram(
-    name='twoofthree', meta={'scale': 1, 'special': '/'}, accepts={
+accepts={
     'u': ['top corner', 'at polar(6,2) (0,1)'],
     'l': ['left corner', 'at polar(6,2) (2,1)'],
     'r': ['right corner', 'at polar(6,2) (4,1)'],
@@ -30,4 +57,5 @@ protocols['2d203aaff5b2a70c5a24fab8c26a0095'] = Diagram(
     '-l': ['right side', 'at middle(u,r)'],
     '-r': ['left side', 'at middle(u,l)'],
     't': ['title', 'at cartesian(2,2) (-1,1)']
-}, requests=['line of -u communicates l/r', 'line of -l communicates u/r', 'line of -r communicates u/l'])
+}
+'''
