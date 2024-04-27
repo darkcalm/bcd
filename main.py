@@ -1,42 +1,41 @@
-from views import DiscordBotView
-from world import protocols
+from presets import protocols
+from macros import DiagramBotAgent
 
 import discord
 from discord.ext import commands
+
+import os
 import asyncio
 
-from actions import Epoch
-import os
-
-view = DiscordBotView(delimiter=';')
+dba = DiagramBotAgent()
 
 for hash, diagram in protocols.items():
-    view.write_discord_choice(hash, diagram)
+    dba.write_discord_choice(hash, diagram)
 
 bot = commands.Bot(command_prefix='/', intents=discord.Intents.default())
 
-@bot.tree.command(name='bcd', description = "generate diagram with /bcd. update by replying to bcd outputs")
-@discord.app_commands.describe(diagram="choose diagram to assign to", assignments="syntax: t my_title" + view.delimiter + " label my_label" + view.delimiter + " etc.", publish="send message publicly", about="read what each label means for a diagram (to dm)")
+@bot.tree.command(name='bcd', description = "generate diagrams. update bcd diagrams through replies. use /bcd to see the list of diagrams.")
+@discord.app_commands.describe(diagram="choose diagram to assign to", accepts="show what a diagram accepts (to dm)", assignment="recommend: t my_title; q1 my_q1; etc.", publish="send message publicly")
 
 @discord.app_commands.choices(
-    diagram = view.choices,
-    publish = [discord.app_commands.Choice(name='private', value=0), discord.app_commands.Choice(name='public', value=1)],
-    about = view.choices)
+    diagram = dba.choices,
+    accepts = dba.choices,
+    publish = [discord.app_commands.Choice(name='private', value=0), discord.app_commands.Choice(name='public', value=1)])
 
 async def bcd(interaction: discord.Interaction,
               diagram: str = "",
-              assignments: str = "",
-              publish: int = 0,
-              about: str = ""):
+              accepts: str = "",
+              assignment: str = "",
+              publish: int = 0):
 
     if diagram != "":
         await interaction.response.defer()
         await asyncio.sleep(5)
         await bcdoutput(interaction, {'diagram': protocols[diagram],
-                                      'history': None}, publish)
+                                      'history': []}, publish)
 
-    elif about != "":
-        await interaction.user.send(view.get_diagram_info(protocols[diagram]))
+    elif accepts != "":
+        await interaction.user.send(dba.get_diagram_info(protocols[diagram]))
     
     else:
         await interaction.user.send("🤔 unresponsive to input")
@@ -58,17 +57,16 @@ async def on_message(interaction):
         pass
     elif interaction.content in ['delete', 'd']:
         await message.delete()
+        
     elif message.attachments:
-        await bcdoutput(interaction, {'diagram': view.get_diagram_by_attachments(message.attachments),
-                        'history': message}, True)
+        await bcdoutput(
+            interaction,
+            {'diagram': dba.get_diagram(message),
+             'history': [message]}, True)
 
-
-async def bcdoutput(interaction, head, publish):
-    epoch = Epoch(delimiter=';')
-    seed = await epoch.text_to_seed(head, interaction)
-    files = await epoch.seed_to_files(head, seed)
-    await interaction.followup.send(
-        seed, files=[discord.File(f) for f in files], ephemeral=not publish)
+async def bcdoutput(interaction, body, publish):
+    seed = await dba.text_to_seed(interaction, body)
+    await dba.seed_to_files(interaction, seed)
 
 @bot.event
 async def on_ready():
