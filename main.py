@@ -1,73 +1,75 @@
-from presets import Protocols
-from macros import DiagramBotHelper
+from presets import Protocols, Payload
+from agents import SessionAgent
 
 import discord
 from discord.ext import commands
 
 import os
-import asyncio
 
-dba = DiagramBotHelper()
+sessions = {}
 
-for hash, diagram in Protocols.items():
-    dba.write_discord_choice(hash, diagram)
+def append_session(token):
+    sessions[token] = SessionAgent(token)
+    return sessions[token]
+
+choices = []
+
+for name in Protocols.keys():
+    choices.append(discord.app_commands.Choice(name=name, value=name))
 
 bot = commands.Bot(command_prefix='/', intents=discord.Intents.default())
 
-@bot.tree.command(name='bcd', description = "generate diagrams. update bcd diagrams through replies. use /bcd to see the list of diagrams.")
-@discord.app_commands.describe(diagram="choose diagram to assign to", options="what the assignment options are for a diagram (dm)", assignment="recommend: t my_title; q1 my_q1; etc.", publish="send message publicly")
+@bot.tree.command(name='bcd', description = "generate diagrams. update diagrams through replies. use /bcd to see the list of diagrams.")
+@discord.app_commands.describe(diagram="choose which diagram to assign to", information="(optional) provides a sample of an assignment for the diagram in dm", assignment="recommend: key content; key content etc.", publish="send bcd outputs publicly")
 
 @discord.app_commands.choices(
-    diagram = dba.choices,
-    options = dba.choices,
+    diagram = choices,
+    information = choices,
     publish = [discord.app_commands.Choice(name='private', value=0), discord.app_commands.Choice(name='public', value=1)])
 
 async def bcd(interaction: discord.Interaction,
               diagram: str = "",
-              options: str = "",
+              information: str = "",
               assignment: str = "",
               publish: int = 0):
-
-    if diagram != "":
-        await interaction.response.defer()
-        await asyncio.sleep(5)
-        await bcdoutput(interaction, {'diagram': [Protocols[diagram]],
-                                      'history': []}, publish)
-
-    elif options != "":
-        await interaction.user.send(dba.get_diagram_info(Protocols[diagram]))
     
+    if diagram != "":
+        sa = append_session(interaction.token)
+        await sa.output(interaction, Payload(assignment, diagram), publish)
+        del sa
+
+    elif information != "":
+        await interaction.user.send(information + "% " + "; ".join([
+                k+" "+v for k, v in Protocols[information].keys.items()]))
+
     else:
         await interaction.user.send("🤔 unresponsive to input")
 
+
 @bot.event
-async def on_message(interaction):
+async def on_message(interaction):    
+    if not bot.user:
+        return
     if interaction.author.id == bot.user.id:
         return
-    if interaction.reference is None:
-        return
-    if interaction.reference.message_id is None:
-        return
-    
-    message = await interaction.channel.fetch_message(interaction.reference.message_id)
-    if message.author.id != bot.user.id:
-        return
-        
-    if interaction.content in ['comment', '#']:
-        pass
-    elif interaction.content in ['delete', 'd']:
-        await message.delete()
-        
-    elif message.attachments:
-        await bcdoutput(
-            interaction,
-            {'diagram': [dba.get_diagram(message)],
-             'history': [message]}, True)
 
-async def bcdoutput(interaction, body, publish):
-    body['history'].append([interaction])
-    seed = dba.text_to_seed(interaction, body)
-    await dba.seed_to_files(interaction, body, seed)
+    sa = append_session(interaction.token)
+    
+    if interaction.reference is not None:                
+        reference = await interaction.channel.fetch_message(interaction.reference.message_id)
+        if reference.author.id == bot.user.id:
+            if interaction.content in ['delete', 'd']:
+                await reference.delete()
+
+            else:
+                await sa.output(interaction,
+                                Payload(interaction.content,
+                                        previous=reference.content), True)
+
+    else:
+        await sa.output(interaction, Payload(interaction.content), True)
+
+    del sa
 
 @bot.event
 async def on_ready():

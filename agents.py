@@ -1,97 +1,85 @@
+import asyncio
+import os.path
+
 from pyx import canvas, path
+# for pyx text, import using nix: pkgs.texlive.combined.scheme-basic
 
-class OptionAgent:
-    def __init__(self, head, body):
-        pass
+from discord import File
 
-    def observe(self):
+from wand.color import Color
+from wand.image import Image
+
+from consensus import TextConsensus, DrawConsensus
+
+class SessionAgent:
+    def __init__(self, token):
+        self.token = token
+
+    async def output(self, interaction, payload, publish):
+        await interaction.response.defer()
+        await asyncio.sleep(5)
+        
+        diagram = payload[-1]['diagram']
+        path = os.path.join(self.token)
+
+        tc_ = [TextConsensus() for h in payload]
+        
+        SimulationAgent() #check converge
+
+        dc = DrawConsensus()
+
+        SimulationAgent()
+
+        self.draw_PyX(payload['requests'])
+        
+        with Color('white') as b:
+            with Image(filename=path+'.svg', format='svg', background=b) as i:
+                png_image = i.make_blob('png32')
+                with open(path+'.png', 'wb') as out:
+                    out.write(png_image)
+
+        files = []
+        for p in [path+'.svg', path+'.png']:
+            with open(p, 'rb') as f:
+                files.append(File(f))
+
+        await interaction.followup.send(diagram.printedseed(payload),
+            files, ephemeral=not interaction.data.get('publish'))
+    
+    def draw_PyX(self, requests):
+        c = canvas.canvas()    
+        for r in requests:
+            if r.type == 'line':
+                c.stroke(path.line(*r.args))
+            elif r.type == 'text':
+                c.text(*r.args)
+
+        c.writeSVGfile(path) 
+        
+        
+class SimulationAgent:
+    def __init__(self):
+        self.time = 0
+
+    async def run(self, agents):
         pass
+        
+
+class KeyAgent:
+    def __init__(self, parent, key, requests):
+        self.parent = parent
+        self.key = key
+        self.requests = requests
+
+
+    def orient(self):
+        current = 0
+
 
 class StrokeAgent:
-    def __init__(self, key, text):
+    def __init__(self, parent):
+        self.parent = parent
+
         pass
 
-    def observe(self):
-        pass
-
-
-
-
-
-class TextAgent:
-    def __init__(self, interaction, diagram):
-        self.seed = ""
-        self.diagram = diagram
-
-        self.agents = [OptionAgent(k, v) for k, v in self.diagram.options.items()]
-        self.conflicts = {'overlaps': self.agents} # should populate by diagram
-        self.evaluations = {}
-
-            
-    def facilitate(self):
-        pass
-
-    def infer(self, previous):
-        pass
-
-
-class DrawingAgent:
-    def __init__(self, diagram, seed):
-        self.canvas = canvas.canvas()
-        self.diagram = diagram
-    
-        self.agents = [StrokeAgent(key, text) for key, text in zip(self.diagram.options.keys(), seed) if text] # should include lines
-        self.conflicts = {'overflows': self.agents, 'overlaps': self.agents, 'nones': self.agents}
-        self.evaluations = {}
-    
-    def __line__(self, *args):
-        self.canvas.stroke(path.line(*args))
-
-    def __text__(self, *args): 
-        self.canvas.text(*args) # pkgs.texlive.combined.scheme-basic (nix)
-
-    def __inspecttext__(self, *args):
-        pass
-    
-    def __inspectline__(self, *args):
-        pass
-
-    def facilitate(self):
-        pass
-    
-    def infer(self, previous):
-        # assign agent values to m and arg
-        for m, args in self.evaluations.items():
-            eval(m)(*args)
-        return self.canvas.writeSVGfile(self.diagram.name)
-
-'''
-
-import re
-from functools import reduce
-from operator import iconcat
-
-def texts_to_query(text, agent):
-    tf = [q.strip(' ') for q in re.split(r"(?<!\\)"+self.delimiter, tf)]
-
-    if len(tf) == len(diagram.get_agents()):
-        return [(a.key, tf[i]) for i, a in enumerate(diagram.get_agents())]
-
-    return [(q.split(' ', 1)[0], q.split(' ', 1)[1:]) for q in tf if (len(q.split(' ', 1)) > 1) and (q.split(' ', 1)[0] in diagram.get_agent_keys())]
-
-def amend_querys(query):
-    return {k:v for (k, v) in reduce(iconcat, query, [])}
-
-def query_to_seed(query):
-    return self.delimiter.join([(query[k] if k in query else '')
-                           for k in diagram.get_agent_keys()])
-
-texts = [texts] if isinstance(texts, str) else texts
-
-return query_to_seed(
-    amend_querys(
-        [texts_to_query(tf) for tf in texts]
-    )
-)
-'''
-
+    #some kind of tool use
