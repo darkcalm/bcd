@@ -31,7 +31,7 @@ async def bcd(interaction: discord.Interaction,
     if diagram != "":
         await interaction.response.defer()
         await asyncio.sleep(5)
-        await bcdoutput(interaction, {'diagram': Protocols[diagram],
+        await bcdoutput(interaction, {'diagram': [Protocols[diagram]],
                                       'history': []}, publish)
 
     elif options != "":
@@ -61,12 +61,13 @@ async def on_message(interaction):
     elif message.attachments:
         await bcdoutput(
             interaction,
-            {'diagram': dba.get_diagram(message),
+            {'diagram': [dba.get_diagram(message)],
              'history': [message]}, True)
 
 async def bcdoutput(interaction, body, publish):
-    seed = await dba.text_to_seed(interaction, body)
-    await dba.seed_to_files(interaction, body['diagram'], seed)
+    body['history'].append([interaction])
+    seed = dba.text_to_seed(interaction, body)
+    await dba.seed_to_files(interaction, body, seed)
 
 @bot.event
 async def on_ready():

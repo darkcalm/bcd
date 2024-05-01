@@ -6,7 +6,7 @@ from wand.api import library
 import wand.color
 import wand.image
 
-from agents import TextAgent, DrawAgents
+from agents import TextAgent, DrawingAgent
 
 class DiagramBotHelper:
     def __init__(self):
@@ -29,31 +29,44 @@ class DiagramBotHelper:
 
     def flatten_seed(self, seed):
         return ';'.join(escape(x) for x in seed)
+
+    def agents_check_requests(self, agents, requests):
+        #inspect, facilitate, infers
+        pass
     
-    async def text_to_seed(self, interaction, body):
-        h_ = body['history'].append([interaction])
-        ta_ = [TextAgent(self.deflatten_seed(h.content), body['diagram']) for h in h_]
+    def text_to_seed(self, interaction, body):
+        ta_ = [TextAgent(self.deflatten_seed(h.content), body['diagram']) for h in body['history']]
 
         for i, ta in enumerate(ta_):
+            self.agents_check_requests(ta.agents, body['diagram'].requests)
+
+            for a in ta.agents:
+                a.observe()
+            
             while any(ta.conflicts.values()):
-                ta.inspects()
-                ta.facilitates()
+                ta.facilitate()
+                
             if i:
-                ta.infers(ta_[i-1])
-        
+                ta.infer(ta_[i-1])
+
         return ta_[-1].seed
 
-    async def seed_to_files(self, interaction, diagram, seed):
+    async def seed_to_files(self, interaction, body, seed):
+        da_ = [DrawingAgent(d, seed) for d in body['diagram']]
         
-        da = DrawAgents(diagram, seed)
+        for i, da in enumerate(da_):
+            self.agents_check_requests(da.agents, body['diagram'].requests)
 
-        while any(da.conflicts.values()):
-            da.inspects()
-            da.facilitates(next(x for x in da.conflicts.values() if x))
+            for a in da.agents:
+                a.observe()
             
-        da.infers()
-        
-        fns = [da.diagram.name + '.svg', da.diagram.name + '.png']
+            while any(da.conflicts.values()):
+                da.facilitate()
+                
+            if i:
+                da.infer(da_[i-1])
+                
+        fns = [da_[-1].diagram.name + '.svg', da_[-1].diagram.name + '.png']
         with wand.image.Image(resolution = 300) as image:
             with wand.color.Color('white') as background_color:
                 library.MagickSetBackgroundColor(image.wand, 

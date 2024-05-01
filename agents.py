@@ -4,36 +4,44 @@ class OptionAgent:
     def __init__(self, head, body):
         pass
 
+    def observe(self):
+        pass
+
+class StrokeAgent:
+    def __init__(self, key, text):
+        pass
+
+    def observe(self):
+        pass
+
+
+
+
+
 class TextAgent:
-    
     def __init__(self, interaction, diagram):
         self.seed = ""
         self.diagram = diagram
 
         self.agents = [OptionAgent(k, v) for k, v in self.diagram.options.items()]
-        self.conflicts = {'overlaps': []} # should populate by diagram
+        self.conflicts = {'overlaps': self.agents} # should populate by diagram
         self.evaluations = {}
 
-    def inspects(self):
-        pass
             
-    def facilitates(self):
+    def facilitate(self):
         pass
 
-    def infers(self, previous):
+    def infer(self, previous):
         pass
 
-class DrawAgent:
-    def __init__(self, key, text):
-        pass
 
-class DrawAgents:
+class DrawingAgent:
     def __init__(self, diagram, seed):
         self.canvas = canvas.canvas()
         self.diagram = diagram
     
-        self.agents = [DrawAgent(key, text) for key, text in zip(self.diagram.options.keys(), seed) if text] # should include lines
-        self.conflicts = {'overflows': [self.agents], 'overlaps': [self.agents], 'nones': [self.agents]}
+        self.agents = [StrokeAgent(key, text) for key, text in zip(self.diagram.options.keys(), seed) if text] # should include lines
+        self.conflicts = {'overflows': self.agents, 'overlaps': self.agents, 'nones': self.agents}
         self.evaluations = {}
     
     def __line__(self, *args):
@@ -48,16 +56,10 @@ class DrawAgents:
     def __inspectline__(self, *args):
         pass
 
-
-    def inspects(self):
-        for a in self.agents:
-            # run agents to inspect things
-            pass
-    
-    def facilitates(self, conflictagents):
+    def facilitate(self):
         pass
     
-    def infers(self):
+    def infer(self, previous):
         # assign agent values to m and arg
         for m, args in self.evaluations.items():
             eval(m)(*args)
