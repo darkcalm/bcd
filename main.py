@@ -20,22 +20,22 @@ for name in Protocols.keys():
 bot = commands.Bot(command_prefix='/', intents=discord.Intents.default())
 
 @bot.tree.command(name='bcd', description = "generate diagrams. update diagrams through replies. use /bcd to see the list of diagrams.")
-@discord.app_commands.describe(diagram="choose which diagram to assign to", information="(optional) provides a sample of an assignment for the diagram in dm", assignment="recommend: key content; key content etc.", publish="send bcd outputs publicly")
+@discord.app_commands.describe(information="(optional) provides a sample of an assignment for the diagram in dm", diagram="choose which diagram to assign to", assignment="recommend: key content; key content etc.", publish="send bcd outputs publicly")
 
 @discord.app_commands.choices(
-    diagram = choices,
     information = choices,
+    diagram = choices,
     publish = [discord.app_commands.Choice(name='private', value=0), discord.app_commands.Choice(name='public', value=1)])
 
 async def bcd(interaction: discord.Interaction,
-              diagram: str = "",
               information: str = "",
+              diagram: str = "",
               assignment: str = "",
               publish: int = 0):
     
-    if diagram != "":
+    if diagram != "" or assignment != "":
         sa = append_session(interaction.token)
-        await sa.output(interaction, Payload(diagram+"%%"+assignment), publish)
+        await sa.output(interaction, Payload(diagram+"%% ", assignment), publish)
         del sa
 
     elif information != "":
@@ -52,22 +52,18 @@ async def on_message(interaction):
         return
     if interaction.author.id == bot.user.id:
         return
-
-    sa = append_session(interaction.token)
     
     if interaction.reference is not None:                
+        sa = append_session(interaction.reference.message_id)        
         reference = await interaction.channel.fetch_message(interaction.reference.message_id)
+        
         if reference.author.id == bot.user.id:
             if interaction.content in ['delete', 'd']:
                 await reference.delete()
-
             else:
                 await sa.output(interaction, Payload(reference.content, interaction.content), True)
 
-    else:
-        await sa.output(interaction, Payload(interaction.content), True)
-
-    del sa
+        del sa
 
 @bot.event
 async def on_ready():

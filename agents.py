@@ -15,10 +15,12 @@ class SessionAgent:
 
     async def output(self, interaction, payload, publish):
         await interaction.response.defer()
+        await interaction.followup.send(payload['diagram'].printedseed(payload['keyed']), ephemeral=not publish)
         await asyncio.sleep(5)
         
         path = os.path.join(self.token)
-
+        
+        '''
         SimulationAgent([KeyAgent(self) for h in payload.diagram.keys.keys()]).converge() #check converge
 
         SimulationAgent([RequestAgent(self) for r in payload.diagram.requests]).converge()
@@ -34,11 +36,8 @@ class SessionAgent:
         files = []
         for p in [path+'.svg', path+'.png']:
             with open(p, 'rb') as f:
-                files.append(File(f))
+                files.append(File(f))'''
 
-        await interaction.followup.send(diagram.printedseed(payload),
-            files, ephemeral=not interaction.data.get('publish'))
-    
     def draw_PyX(self, requests):
         c = canvas.canvas()    
         for r in requests:
