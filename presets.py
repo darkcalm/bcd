@@ -1,29 +1,26 @@
 # bcd diagram bot presets are protocols that call modules with properties
 # targets (seeds of text) are used to generate required properties
 # requests are used to generate optional properties
-# hashes: adler32
+# tests: https://programiz.pro/ide/python/0B38DRB3MQ
 
 import re
 
-def Payload(text, diagram=None, previous={}):
-    try:        
-        if diagram:
-            return dict(
-                dict(
-                    {'diagram': Protocols[diagram], 'content': text},
-                    **{'keyed': Protocols[diagram].seeded(previous)}
-                ),
-                **{'keyed': Protocols[diagram].seeded(text)}
-            )
-        
-        text = [s.strip() for s in text.split('%', 1)]
-        return dict(
-            dict(
-                {'diagram': Protocols[text[0]], 'content': text[1]},
-                **{'keyed': Protocols[text[0]].seeded(previous)}
-            ),
-            **{'keyed': Protocols[text[0]].seeded(text[1])}
-        )
+from functools import reduce
+
+def Payload(*args):
+    def flatten(dict_list):
+        return {**dict_list[0], **flatten(dict_list[1:])}
+
+    try:
+        args = list(map(lambda x: (x[0][0].rstrip('%%').strip(),
+                                   x[0][1].strip()),
+                        [re.findall(r'(.*%%)*(.+)', t) for t in args]))
+
+        P = Protocols[
+        reduce(lambda a, b: a or b, [t[0] for t in args])]
+        args = reduce(lambda a, b: {**a, **b}, [P.seeded(t[1]) for t in args])
+
+        return {'diagram': P, 'keyed': args}
 
     except KeyError:
         return None
@@ -33,35 +30,34 @@ class Diagram:
     def __init__(self, name="", keys={}, requests=[]):
         self.keys = keys
         self.requests = requests
-    
-    def printedseed(self, payload):
-        return '%'.join([payload['diagram'],
-                         ';'.join([re.escape(x) for x in payload['keyed']])])
 
-    # tests: https://programiz.pro/ide/python/0B38DRB3MQ
+    def printedseed(self, payload):
+        return '%%'.join([payload['diagram'],
+                         ';'.join([re.escape(x) for x in payload['keyed']])])
+    
+    def descape(self, list):
+        return [re.sub(r'\\(.)', r'\1', t) for t in list]
     
     def seeded(self, text):
         try:
-            return [
-                {'key': k, 'quote': re.sub(r'\\(.)', r'\1', text.split(';')[i])}
-                for i, k in enumerate(self.keys.keys())]
+            return dict(zip(
+                self.keys.keys(),
+                list(map(
+                    lambda t:{'quote': t},
+                    self.descape(text.split(';'))))))
+
         except IndexError:
             return self.assigned(text)
 
     def assigned(self, text):
-        return list(map(
-            lambda x: {'key': x[0][0] or x[0][2],
-                       'quote': [_[1] or _[3] for _ in x]},
-            [x for x in [re.findall(
-                r'^(1) ([^;]*)|; *(1) ([^;]*)[; ]*'.replace('1', k), text)
-                         for k in self.keys.keys()
-                        ] if x
-            ]))
-
+        return dict(zip(
+            self.keys.keys(),
+            list(map(
+                lambda _: {'quote': _[1] or _[3]},
+                self.descape([re.findall(r'^(1) ([^;]*)|; *(1) ([^;]*)[; ]*'.replace('1', k), text) for k in self.keys.keys()])))))
 
 Protocols = {} 
 Protocols['2x2'] = Diagram(
-    name='twobytwo',
     keys={'q1': ['quadrant 1'], 'q2': ['quadrant 2'], 'q3': ['quadrant 3'], 'q4': ['quadrant 4'], 'xp': ['positive x'], 'xn': ['negative x'], 'yp': ['positive y'], 'yn': ['negative y'], 'x': ['axis x'], 'y': ['axis y'], 't': ['title']},
     requests={
         'functionandpropertiesandvalues1': ['line of x at xp/xn'],
@@ -69,14 +65,12 @@ Protocols['2x2'] = Diagram(
     })
 
 Protocols['2of3'] = Diagram(
-    name='twoofthree',
     keys={'u': ['top corner'], 'l': ['left corner'], 'r': ['right corner'], '-u': ['bottom side'], '-l': ['right side'], '-r': ['left side'], 't': ['title']},
     requests={
         'functionandproperties1': ['line of -u at l/r'],
         'functionandproperties2': ['line of -l at u/r'],
         'functionandproperties3': ['line of -r at u/l']
     })
-
 
 
 

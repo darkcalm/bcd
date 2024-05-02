@@ -9,8 +9,6 @@ from discord import File
 from wand.color import Color
 from wand.image import Image
 
-from consensus import TextConsensus, DrawConsensus
-
 class SessionAgent:
     def __init__(self, token):
         self.token = token
@@ -19,16 +17,11 @@ class SessionAgent:
         await interaction.response.defer()
         await asyncio.sleep(5)
         
-        diagram = payload[-1]['diagram']
         path = os.path.join(self.token)
 
-        tc_ = [TextConsensus() for h in payload]
-        
-        SimulationAgent() #check converge
+        SimulationAgent([KeyAgent(self) for h in payload.diagram.keys.keys()]).converge() #check converge
 
-        dc = DrawConsensus()
-
-        SimulationAgent()
+        SimulationAgent([RequestAgent(self) for r in payload.diagram.requests]).converge()
 
         self.draw_PyX(payload['requests'])
         
@@ -66,17 +59,15 @@ class SimulationAgent:
         
 
 class KeyAgent:
-    def __init__(self, parent, key, requests):
+    def __init__(self, parent):
         self.parent = parent
-        self.key = key
-        self.requests = requests
 
 
     def orient(self):
-        current = 0
+        pass
 
 
-class StrokeAgent:
+class RequestAgent:
     def __init__(self, parent):
         self.parent = parent
 

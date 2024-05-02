@@ -35,11 +35,11 @@ async def bcd(interaction: discord.Interaction,
     
     if diagram != "":
         sa = append_session(interaction.token)
-        await sa.output(interaction, Payload(assignment, diagram), publish)
+        await sa.output(interaction, Payload(diagram+"%%"+assignment), publish)
         del sa
 
     elif information != "":
-        await interaction.user.send(information + "% " + "; ".join([
+        await interaction.user.send(information + "%% " + "; ".join([
                 k+" "+v for k, v in Protocols[information].keys.items()]))
 
     else:
@@ -62,9 +62,7 @@ async def on_message(interaction):
                 await reference.delete()
 
             else:
-                await sa.output(interaction,
-                                Payload(interaction.content,
-                                        previous=reference.content), True)
+                await sa.output(interaction, Payload(reference.content, interaction.content), True)
 
     else:
         await sa.output(interaction, Payload(interaction.content), True)
