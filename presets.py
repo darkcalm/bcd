@@ -10,7 +10,7 @@ def Payload(*args):
         args = list(map(lambda x: (x[0][0].rstrip('<>').strip(), x[0][1].strip()), [re.findall(r'(.*<>)*(.+)', arg) for arg in args]))
 
         P = Protocols[reduce(lambda a, b: a or b, [arg[0] for arg in args])]
-        
+
         args = reduce(lambda a, b: {**a, **b}, [P.assignedbyseed(arg[1]) if arg[0] else P.assignedbykey(arg[1]) for arg in args])
 
         return {'diagram': P, 'keyed': args}
@@ -18,18 +18,31 @@ def Payload(*args):
     except KeyError:
         return None
 
+class Affine(dict):
+    def __init__(self, *args, **kwargs):
+        self.__setitem__(args[0], args[1])
+
+    def __getitem__(self, key):
+        return dict.__getitem__(self, frozenset(key))
+
+    def __setitem__(self, key, value):
+        dict.__setitem__(self, frozenset(key), value)
+
+s = Affine(['x','y'], 'link_of_x_and_y')
+print(s[['y','x']])
+
 class Diagram:
-    def __init__(self, prefix, keys={}, seedformats={}, requests={}):
+    def __init__(self, prefix, keys={}, affine=[], seedformats={}, requests={}):
         self.prefix = prefix
         self.keys = keys
+        self.affine = affine
         self.seedformats = seedformats # should be seedgenerator
         self.requests = requests
 
     def printedseed(self, keyed):
         return ' <> '.join([
             self.prefix,
-            '; '.join(
-                [re.escape(keyed[k]['assigned']) if k in keyed else '' for k in self.keys.keys()])])
+            '; '.join([re.escape(keyed[k]['assigned']) if k in keyed else '' for k in self.keys.keys()])])
 
     def descape(self, t):
         return re.sub(r'\\(.)', r'\1', t)
@@ -59,6 +72,7 @@ Protocols = {}
 Protocols['2x2'] = Diagram(
     prefix='2x2',
     keys={'q1': ['quadrant 1'], 'q2': ['quadrant 2'], 'q3': ['quadrant 3'], 'q4': ['quadrant 4'], 'xp': ['positive x'], 'xn': ['negative x'], 'yp': ['positive y'], 'yn': ['negative y'], 'x': ['axis x'], 'y': ['axis y'], 't': ['title']},
+    affine=[],
     seedformats={11: list(range(11)), 10: list(range(10)), 9: list(range(8))+[10], 8: list(range(8)), 7: list(range(4,11)), 6: list(range(4,10)), 5: list(range(4,8))+[10], 4: list(range(4,8)), 3:[8,9,10], 2: [8,9], 1:[10]},
     requests={
         'functionandpropertiesandvalues1': ['line of x at xp/xn'],
