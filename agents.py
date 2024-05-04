@@ -14,7 +14,6 @@ class SessionAgent:
         self.token = token
 
     async def output(self, interaction, payload, publish):
-        await interaction.response.defer()
         await interaction.followup.send(payload['diagram'].printedseed(payload['keyed']), ephemeral=not publish)
         await asyncio.sleep(5)
         

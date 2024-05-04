@@ -20,27 +20,30 @@ for name in Protocols.keys():
 bot = commands.Bot(command_prefix='/', intents=discord.Intents.default())
 
 @bot.tree.command(name='bcd', description = "generate diagrams. update diagrams through replies. use /bcd to see the list of diagrams.")
-@discord.app_commands.describe(information="(optional) provides a sample of an assignment for the diagram in dm", diagram="choose which diagram to assign to", assignment="recommend: key content; key content etc.", publish="send bcd outputs publicly")
+@discord.app_commands.describe(see_keys="(optional) provides a sample of an assign for the diagram in dm", diagram="choose which diagram to assign to", assign="recommend: key content; key content etc.", publish="send bcd outputs publicly")
 
 @discord.app_commands.choices(
-    information = choices,
+    see_keys = choices,
     diagram = choices,
     publish = [discord.app_commands.Choice(name='private', value=0), discord.app_commands.Choice(name='public', value=1)])
 
 async def bcd(interaction: discord.Interaction,
-              information: str = "",
+              see_keys: str = "",
               diagram: str = "",
-              assignment: str = "",
+              assign: str = "",
+              #request: str="",
               publish: int = 0):
     
-    if diagram != "" or assignment != "":
+    await interaction.response.defer()
+    
+    if diagram != "" or assign != "":
         sa = append_session(interaction.token)
-        await sa.output(interaction, Payload(diagram+"%% ", assignment), publish)
+        await sa.output(interaction, Payload(diagram+" <> ", assign), publish)
         del sa
 
-    elif information != "":
-        await interaction.user.send(information + "%% " + "; ".join([
-                k+" "+v for k, v in Protocols[information].keys.items()]))
+    elif see_keys != "":
+        await interaction.followup.send(see_keys + " <> " + "; ".join([
+                k+" "+str(v) for k, v in Protocols[see_keys].keys.items()]))
 
     else:
         await interaction.user.send("🤔 unresponsive to input")
